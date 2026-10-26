@@ -6,11 +6,11 @@ plugins {
 
 android {
   namespace = "com.hackra.ulanzi.companion"
-  compileSdk = 35
+  compileSdk = 36
   defaultConfig {
     applicationId = "com.hackra.ulanzi.companion"
     minSdk = 26
-    targetSdk = 35
+    targetSdk = 36
     versionCode = 1
     versionName = "1.0"
   }
@@ -81,4 +81,10 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+
+  // Networking & Serialization
+  implementation(libs.okhttp)
+  implementation(libs.okhttp.logging)
+  implementation(libs.kotlinx.serialization.json)
+  implementation(libs.kotlinx.coroutines.android)
 }
