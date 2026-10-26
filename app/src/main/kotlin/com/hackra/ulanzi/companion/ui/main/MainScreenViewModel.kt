@@ -577,14 +577,22 @@ class MainScreenViewModel(
 
             // 6. YouTube
             if (effectiveYtChannel.isNotBlank()) params["yt_channel"] = effectiveYtChannel
-            if (!ytKey.isNullOrBlank()) params["yt_key"] = ytKey
+            if (!ytKey.isNullOrBlank()) {
+                params["yt_key"] = ytKey
+            } else if (current?.ytHasKey == true) {
+                params["yt_key"] = "********"
+            }
 
             // 7. MQTT & Home Assistant
             if (effectiveMqttEn) params["mqtt_en"] = "1"
             if (effectiveMqttSrv.isNotBlank()) params["mqtt_srv"] = effectiveMqttSrv
             params["mqtt_port"] = effectiveMqttPort.toString()
             if (effectiveMqttUser.isNotBlank()) params["mqtt_user"] = effectiveMqttUser
-            if (!mqttPass.isNullOrBlank()) params["mqtt_pass"] = mqttPass
+            if (!mqttPass.isNullOrBlank()) {
+                params["mqtt_pass"] = mqttPass
+            } else if (current?.mqttHasPass == true) {
+                params["mqtt_pass"] = "********"
+            }
             params["mqtt_pre"] = effectiveMqttPre
 
             // 8. Wi-Fi Multi-Profile Management

@@ -69,7 +69,8 @@ class VirtualClockState:
         self.weather_lat = 48.1486
         self.weather_lon = 17.1077
         self.crypto_symbol = "BTC"
-        self.yt_channel = "@hackra"
+        self.yt_channel = "@CuriousCatFPV"
+        self.yt_subscribers = "844"
         self.yt_has_key = True
 
         # MQTT
@@ -133,7 +134,7 @@ class VirtualClockState:
                 "transition_fx": self.transition_fx,
                 "active_app": app_idx,
                 "app_name": SCREEN_NAMES[app_idx],
-                "firmware_version": "2.2.0",
+                "firmware_version": "2.3.0",
                 "temperature_in": 23.4,
                 "humidity_in": 48.2,
                 "battery_volts": 4.15,
@@ -147,7 +148,7 @@ class VirtualClockState:
                 "weather_city": self.weather_city,
                 "crypto_symbol": self.crypto_symbol,
                 "crypto_price": "67.8K",
-                "yt_subscribers": "1.25K",
+                "yt_subscribers": self.yt_subscribers,
                 "timer_mode": self.timer_mode,
                 "timer_state": self.timer_state,
                 "timer_duration": self.timer_duration,
@@ -485,7 +486,10 @@ class UlanziSimulatorHandler(BaseHTTPRequestHandler):
                 elif "c_sym" in form:
                     clock_state.crypto_symbol = form["c_sym"][0]
 
-                if "yt_channel" in form: clock_state.yt_channel = form["yt_channel"][0]
+                if "yt_channel" in form:
+                    clock_state.yt_channel = form["yt_channel"][0]
+                    if "curiouscat" in clock_state.yt_channel.lower() or "ucbfgwmm6pccdsxyoaoomgmq" in clock_state.yt_channel.lower():
+                        clock_state.yt_subscribers = "844"
                 clock_state.mqtt_en = ("mqtt_en" in form)
                 if "mqtt_srv" in form: clock_state.mqtt_srv = form["mqtt_srv"][0]
                 if "mqtt_port" in form: clock_state.mqtt_port = int(form["mqtt_port"][0])
