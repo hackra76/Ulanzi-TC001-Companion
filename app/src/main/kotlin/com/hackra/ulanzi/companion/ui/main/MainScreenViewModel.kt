@@ -28,12 +28,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class NavigationTab(val title: String, val iconName: String) {
-    DASHBOARD("Live Matrix", "dashboard"),
-    CONTROLS("Controls", "timer"),
-    MEDIA("Media Sync", "music"),
-    ALERTS("Push Alerts", "notifications"),
-    SETTINGS("Hardware Setup", "settings")
+enum class NavigationTab(val title: String, val shortTitle: String, val iconName: String) {
+    DASHBOARD("Live Matrix", "Matrix", "dashboard"),
+    CONTROLS("Controls", "Controls", "timer"),
+    MEDIA("Media Sync", "Media", "music"),
+    ALERTS("Push Alerts", "Alerts", "notifications"),
+    SETTINGS("Hardware Setup", "Settings", "settings")
 }
 
 data class MainScreenUiState(

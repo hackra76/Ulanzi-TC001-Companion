@@ -11,13 +11,27 @@ android {
     applicationId = "com.hackra.ulanzi.companion"
     minSdk = 26
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "1.0.1"
+  }
+
+  signingConfigs {
+    create("release") {
+      storeFile = file("ulanzi-release.jks")
+      storePassword = "ulanzi-tc001-pass"
+      keyAlias = "ulanzi"
+      keyPassword = "ulanzi-tc001-pass"
+      enableV1Signing = true
+      enableV2Signing = true
+      enableV3Signing = true
+      enableV4Signing = false
+    }
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
+      signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }

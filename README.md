@@ -117,12 +117,27 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
 
 ---
 
+## 📦 Installation & Release Binaries
+
+Download the official signed release APK from **[GitHub Releases](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)**.
+
+### 📲 Installing on Samsung Galaxy (S26 Ultra / S25 / S24 / One UI 6 & 7) & Play Protect
+1. **Samsung Auto Blocker (Unknown App Protection)**:
+   - On recent Samsung Galaxy flagship devices (including S24, S25, and S26 Ultra running One UI 6 / 7), Samsung enables **Auto Blocker** by default. Auto Blocker blocks the installation of any app downloaded outside the Google Play Store or Galaxy Store.
+   - **To install**: Navigate to **Settings** ➔ **Security and privacy** ➔ **Auto Blocker** (or *Unknown app protection*) and toggle it **OFF** temporarily during installation, or enable **Install unknown apps** for your browser / file manager.
+2. **Google Play Protect**:
+   - Official release APKs are signed with a dedicated release certificate (`CN=Ulanzi TC001 Companion`) using Android APK Signature Schemes v2 + v3 with debugging disabled.
+   - If Android displays a prompt stating "Unrecognized developer", click **More details** ➔ **Install anyway**.
+
+---
+
 ## 🛠️ Tech Stack & Architecture
 
 - **Language & UI**: 100% Kotlin with modern **Jetpack Compose** & **Material 3**.
 - **Architecture**: Single-Activity, declarative Compose navigation, MVI/MVVM pattern with StateFlow and Coroutines.
 - **Persistence**: Jetpack DataStore Preferences (`androidx.datastore.preferences`).
 - **Networking**: OkHttp 4.12 & Kotlinx Serialization 1.8 for fast, non-blocking REST API calls.
+- **DPI & Multi-Ratio Scaling**: Hardware-accelerated Compose `Canvas` for 32×8 matrix rendering, flexible `FlowRow` chips, and auto-wrapping responsive layouts supporting ultra-high DPI flagships (S26 Ultra), standard phones, and foldables.
 - **Requirements**:
   - Minimum SDK: Android 8.0 (API 26)
   - Target SDK: Android 15 (API 35)
@@ -140,12 +155,12 @@ cd Ulanzi-TC001-Companion
 # Run unit tests
 .\gradlew.bat test
 
-# Build debug APK
-.\gradlew.bat assembleDebug
+# Build production signed release APK
+.\gradlew.bat assembleRelease
 ```
 
-The compiled APK will be generated at:
-`app/build/outputs/apk/debug/app-debug.apk`
+The compiled release APK will be generated at:
+`app/build/outputs/apk/release/app-release.apk`
 
 ---
 

@@ -2,9 +2,14 @@ package com.hackra.ulanzi.companion.ui.main
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +51,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -182,6 +186,7 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = selected,
                         onClick = { viewModel.selectTab(tab) },
+                        alwaysShowLabel = true,
                         icon = {
                             when (tab) {
                                 NavigationTab.DASHBOARD -> Icon(Icons.Filled.Dashboard, contentDescription = tab.title)
@@ -193,7 +198,9 @@ fun MainScreen(
                         },
                         label = {
                             Text(
-                                text = tab.title,
+                                text = tab.shortTitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 11.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
@@ -483,30 +490,35 @@ fun LiveMatrixCard(
             ) {
                 val pixels = matrix?.pixels
                 if (pixels != null && pixels.size == 8) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceEvenly
+                    Canvas(
+                        modifier = Modifier.fillMaxSize()
                     ) {
+                        val cellW = size.width / 32f
+                        val cellH = size.height / 8f
+                        val gapX = cellW * 0.14f
+                        val gapY = cellH * 0.14f
+                        val dotW = cellW - gapX
+                        val dotH = cellH - gapY
+                        val corner = CornerRadius(minOf(dotW, dotH) * 0.25f)
+
                         for (y in 0 until 8) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                val row = pixels.getOrNull(y).orEmpty()
-                                for (x in 0 until 32) {
-                                    val hex = row.getOrNull(x) ?: "#000000"
-                                    val color = try {
-                                        Color(android.graphics.Color.parseColor(hex))
-                                    } catch (_: Exception) {
-                                        Color(0xFF101418)
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(RoundedCornerShape(1.5.dp))
-                                            .background(color)
-                                    )
+                            val row = pixels.getOrNull(y).orEmpty()
+                            for (x in 0 until 32) {
+                                val hex = row.getOrNull(x) ?: "#000000"
+                                val color = try {
+                                    Color(android.graphics.Color.parseColor(hex))
+                                } catch (_: Exception) {
+                                    Color(0xFF14181F)
                                 }
+                                drawRoundRect(
+                                    color = color,
+                                    topLeft = Offset(
+                                        x * cellW + gapX / 2f,
+                                        y * cellH + gapY / 2f
+                                    ),
+                                    size = Size(dotW, dotH),
+                                    cornerRadius = corner
+                                )
                             }
                         }
                     }
@@ -621,15 +633,19 @@ fun TelemetryStatTile(
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
+                    fontSize = 14.sp
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = sub,
@@ -637,7 +653,8 @@ fun TelemetryStatTile(
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -678,7 +695,7 @@ fun ScreenSwitcherCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "RAPID SCREEN SWITCHER",
                         style = MaterialTheme.typography.labelMedium.copy(
@@ -692,6 +709,7 @@ fun ScreenSwitcherCard(
                         style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = if (autoRotate) "Auto: ON" else "Auto: OFF",
@@ -714,14 +732,14 @@ fun ScreenSwitcherCard(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("◀ Previous Screen")
+                    Text("◀ Prev", maxLines = 1)
                 }
                 OutlinedButton(
                     onClick = onStepNext,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Next Screen ▶")
+                    Text("Next ▶", maxLines = 1)
                 }
             }
 
@@ -1145,7 +1163,12 @@ fun NotificationForwardingDeckCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Suppress Ongoing (Music, Downloads)", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = "Suppress Ongoing (Music, Downloads)",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Switch(
                     checked = settings.ignoreOngoing,
                     onCheckedChange = { viewModel.setIgnoreOngoing(it) }
@@ -1582,7 +1605,11 @@ fun HardwareSetupDeckCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Auto-Rotate Carousel", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto-Rotate Carousel", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Cycles enabled screens sequentially", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Switch(checked = autoRotate, onCheckedChange = { autoRotate = it })
                 }
 
@@ -1608,27 +1635,49 @@ fun HardwareSetupDeckCard(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("SCREENS IN ROTATION MASK:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = maskClock, onCheckedChange = { maskClock = it })
-                        Text("Clock", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Checkbox(checked = maskWeather, onCheckedChange = { maskWeather = it })
-                        Text("Weather", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Checkbox(checked = maskCrypto, onCheckedChange = { maskCrypto = it })
-                        Text("Crypto", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = maskYouTube, onCheckedChange = { maskYouTube = it })
-                        Text("YouTube", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Checkbox(checked = maskBattery, onCheckedChange = { maskBattery = it })
-                        Text("Battery", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Checkbox(checked = maskAmbient, onCheckedChange = { maskAmbient = it })
-                        Text("Ambient SHT30", style = MaterialTheme.typography.bodySmall)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        FilterChip(
+                            selected = maskClock,
+                            onClick = { maskClock = !maskClock },
+                            leadingIcon = if (maskClock) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                            label = { Text("Clock", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = maskWeather,
+                            onClick = { maskWeather = !maskWeather },
+                            leadingIcon = if (maskWeather) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                            label = { Text("Weather", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = maskCrypto,
+                            onClick = { maskCrypto = !maskCrypto },
+                            leadingIcon = if (maskCrypto) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                            label = { Text("Crypto", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = maskYouTube,
+                            onClick = { maskYouTube = !maskYouTube },
+                            leadingIcon = if (maskYouTube) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                            label = { Text("YouTube", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = maskBattery,
+                            onClick = { maskBattery = !maskBattery },
+                            leadingIcon = if (maskBattery) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                            label = { Text("Battery", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = maskAmbient,
+                            onClick = { maskAmbient = !maskAmbient },
+                            leadingIcon = if (maskAmbient) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
+                            label = { Text("Ambient SHT30", fontSize = 12.sp) }
+                        )
                     }
                 }
             }
@@ -1675,7 +1724,11 @@ fun HardwareSetupDeckCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("24-Hour Time Format", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("24-Hour Time Format", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Toggle between 24h (14:30) and 12h (2:30 PM)", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Switch(checked = timeFormat24h, onCheckedChange = { timeFormat24h = it })
                 }
 
@@ -1707,25 +1760,21 @@ fun HardwareSetupDeckCard(
                     )
                 )
 
-                Row(
+                OutlinedTextField(
+                    value = weatherCity,
+                    onValueChange = { weatherCity = it },
+                    label = { Text("City,Country (e.g. Berlin,DE)") },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = weatherCity,
-                        onValueChange = { weatherCity = it },
-                        label = { Text("City,Country") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = cryptoSymbol,
-                        onValueChange = { cryptoSymbol = it },
-                        label = { Text("Crypto Symbol") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                }
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = cryptoSymbol,
+                    onValueChange = { cryptoSymbol = it },
+                    label = { Text("Crypto Symbol (e.g. BTC, ETH)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
 
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("BTC", "ETH", "SOL", "BNB", "DOGE", "XRP", "TSLA", "NVDA").forEach { sym ->
@@ -1779,7 +1828,10 @@ fun HardwareSetupDeckCard(
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     for (slot in 0..3) {
                         FilterChip(
                             selected = selectedWifiSlot == slot,
@@ -1789,25 +1841,21 @@ fun HardwareSetupDeckCard(
                     }
                 }
 
-                Row(
+                OutlinedTextField(
+                    value = wifiSsidInput,
+                    onValueChange = { wifiSsidInput = it },
+                    label = { Text("Slot $selectedWifiSlot SSID / Network Name") },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = wifiSsidInput,
-                        onValueChange = { wifiSsidInput = it },
-                        label = { Text("Slot $selectedWifiSlot SSID") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = wifiPassInput,
-                        onValueChange = { wifiPassInput = it },
-                        label = { Text("Password") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                }
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = wifiPassInput,
+                    onValueChange = { wifiPassInput = it },
+                    label = { Text("Slot $selectedWifiSlot Password") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1979,6 +2027,7 @@ fun DiscoveryControlCard(
                         style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Switch(
                     checked = autoReconnect,
                     onCheckedChange = onAutoReconnectChange
