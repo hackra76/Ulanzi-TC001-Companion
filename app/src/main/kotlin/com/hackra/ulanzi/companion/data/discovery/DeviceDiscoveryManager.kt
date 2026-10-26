@@ -51,12 +51,13 @@ class DeviceDiscoveryManager(
             _discoveryState.value = DiscoveryState.Scanning(progress = 0f)
             val foundDevices = mutableMapOf<String, DiscoveredDevice>()
 
-            // 1. Immediate probe of standard known targets (mDNS and SoftAP)
-            val directTargets = listOf("ulanzi-tc001.local", "192.168.4.1")
+            // 1. Immediate probe of standard known targets (mDNS, SoftAP, and local test loopbacks)
+            val directTargets = listOf("ulanzi-tc001.local", "192.168.4.1", "10.0.2.2:18080", "127.0.0.1:18080")
             for (target in directTargets) {
                 val status = apiClient.probe(target)
                 if (status != null && status.ip.isNotBlank()) {
-                    val dev = DiscoveredDevice(ip = status.ip, hostname = target, status = status)
+                    val resolvedIp = if (target.contains(":")) target else status.ip
+                    val dev = DiscoveredDevice(ip = resolvedIp, hostname = target, status = status)
                     foundDevices[dev.ip] = dev
                     _discoveryState.value = DiscoveryState.Scanning(
                         progress = 0.2f,

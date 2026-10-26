@@ -32,6 +32,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -249,6 +250,13 @@ fun DiscoveryControlCard(
                     onValueChange = onManualIpChange,
                     label = { Text("IP or Hostname") },
                     singleLine = true,
+                    trailingIcon = {
+                        if (manualIp.isNotEmpty()) {
+                            IconButton(onClick = { onManualIpChange("") }) {
+                                Text("✕", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 Button(
@@ -451,7 +459,7 @@ fun TelemetryDeckCard(status: DeviceStatus) {
             ) {
                 TelemetryMetricItem("TEMP (IN)", "%.1f°C".format(status.temperatureIn))
                 TelemetryMetricItem("HUMIDITY", "%.1f%%".format(status.humidityIn))
-                TelemetryMetricItem("BATTERY", "${status.batteryPct}% (%.2fV)".format(status.batteryVolts))
+                TelemetryMetricItem("BATTERY", "${status.batteryPct}% (" + "%.2f".format(status.batteryVolts) + "V)")
                 TelemetryMetricItem("WI-FI RSSI", "${status.rssi} dBm")
             }
 
