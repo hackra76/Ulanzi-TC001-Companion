@@ -72,6 +72,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -1481,6 +1482,135 @@ fun MediaSyncDeckCard(
 // TAB 5: HARDWARE SETUP & EEPROM FULL CONFIGURATION
 // -------------------------------------------------------------
 
+private val weekdayActiveColors = listOf(
+    0 to ("Cyan" to Color(0xFF00F0FF)),
+    1 to ("Orange" to Color(0xFFFF8800)),
+    2 to ("Green" to Color(0xFF00FF00)),
+    3 to ("Yellow" to Color(0xFFFFFF00)),
+    4 to ("Red" to Color(0xFFFF2200)),
+    5 to ("White" to Color(0xFFFFFFFF)),
+    6 to ("Magenta" to Color(0xFFFF00FF)),
+    7 to ("Electric Blue" to Color(0xFF0066FF)),
+    8 to ("Lime Green" to Color(0xFF76FF03)),
+    9 to ("Amber Gold" to Color(0xFFFFC107)),
+    10 to ("Soft Pink" to Color(0xFFFF4081))
+)
+
+private val weekdayInactiveColors = listOf(
+    0 to ("Dim Auto" to Color(0xFF4A5568)),
+    1 to ("Slate Gray" to Color(0xFF708090)),
+    2 to ("Dim Amber" to Color(0xFF906810)),
+    3 to ("Dark Blue" to Color(0xFF001A40)),
+    4 to ("Deep Wine" to Color(0xFF3A000A)),
+    5 to ("Forest Green" to Color(0xFF002A0D)),
+    6 to ("Charcoal" to Color(0xFF252525)),
+    7 to ("Muted Purple" to Color(0xFF2A1035)),
+    8 to ("Dark Cyan" to Color(0xFF003038)),
+    9 to ("Off (Black)" to Color(0xFF0B0B0A))
+)
+
+private val weekendColors = listOf(
+    0 to ("Same as Active" to Color(0xFF00F0FF)),
+    1 to ("Bright Red" to Color(0xFFFF2200)),
+    2 to ("Coral Orange" to Color(0xFFFF6B4A)),
+    3 to ("Gold" to Color(0xFFFFD700)),
+    4 to ("Hot Pink" to Color(0xFFFF1493)),
+    5 to ("Purple" to Color(0xFF9C27B0)),
+    6 to ("Cyan" to Color(0xFF00F0FF)),
+    7 to ("Lime" to Color(0xFF76FF03)),
+    8 to ("Pure White" to Color(0xFFFFFFFF)),
+    9 to ("Sky Blue" to Color(0xFF00BFFF)),
+    10 to ("Emerald" to Color(0xFF00E676))
+)
+
+private val cityPresets = listOf(
+    "Bratislava" to (48.1486f to 17.1077f),
+    "Košice" to (48.7164f to 21.2611f),
+    "Praha" to (50.0755f to 14.4378f),
+    "Brno" to (49.1951f to 16.6068f),
+    "Vienna" to (48.2082f to 16.3738f),
+    "Budapest" to (47.4979f to 19.0402f),
+    "Warsaw" to (52.2297f to 21.0122f),
+    "Berlin" to (52.5200f to 13.4050f),
+    "London" to (51.5074f to -0.1278f),
+    "Paris" to (48.8566f to 2.3522f),
+    "New York" to (40.7128f to -74.0060f)
+)
+
+private val assetPresets = listOf("BTC", "ETH", "SOL", "BNB", "AAPL", "TSLA", "NVDA", "SPX", "GOLD", "EUR", "USD")
+
+private val screenNames = listOf(
+    0 to "Clock (Heart / Time)",
+    1 to "Indoor SHT30",
+    2 to "Outdoor Weather",
+    3 to "Crypto & Stocks",
+    4 to "YouTube Analytics",
+    5 to "Live Airspace Radar",
+    6 to "Battery & Power",
+    7 to "Stopwatch & Timer",
+    8 to "Ambient Screensaver"
+)
+
+private val transitionFxList = listOf(
+    0 to "Instant Cut",
+    1 to "Slide Left",
+    2 to "Slide Right",
+    3 to "Slide Up",
+    4 to "Slide Down",
+    5 to "Crossfade",
+    6 to "Curtain Wipe",
+    7 to "Random FX"
+)
+
+private val screensaverStyles = listOf(
+    0 to "Matrix Digital Rain",
+    1 to "NeoPixel Fire / Lava",
+    2 to "Pac-Man & Blinky",
+    3 to "Conway's Game of Life",
+    4 to "Dynamic Shuffle"
+)
+
+private val screensaverTimeouts = listOf(
+    0 to "Disabled",
+    1 to "1m",
+    2 to "2m",
+    5 to "5m",
+    10 to "10m",
+    15 to "15m",
+    30 to "30m"
+)
+
+private val clockModes = listOf(
+    0 to "Time Only",
+    1 to "Time + Date",
+    2 to "Date Only"
+)
+
+private val dateFormats = listOf(
+    0 to "DD.MM.",
+    1 to "DD MMM",
+    2 to "MM/DD",
+    3 to "DAY DD"
+)
+
+private val clockIcons = listOf(
+    0 to "Dynamic Calendar (1-31)",
+    1 to "Heart",
+    2 to "Clock",
+    3 to "None"
+)
+
+private val textAlignments = listOf(
+    0 to "Left (with Icon)",
+    1 to "Centered"
+)
+
+private val batteryModes = listOf(
+    2 to "Alternating (% & V)",
+    0 to "Percentage Only",
+    1 to "Voltage Only"
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HardwareSetupDeckCard(
@@ -1490,66 +1620,401 @@ fun HardwareSetupDeckCard(
     val prefs = uiState.devicePreferences
     val status = uiState.deviceStatus
 
-    // Illumination
-    var autoBri by remember(prefs.autoBrightness, status?.autoBri) {
-        mutableStateOf(status?.autoBri ?: prefs.autoBrightness)
-    }
-    var dayBri by remember(prefs.dayBrightness, status?.dayBri) {
-        mutableFloatStateOf((status?.dayBri ?: prefs.dayBrightness).toFloat())
-    }
-    var nightBri by remember(prefs.nightBrightness, status?.nightBri) {
-        mutableFloatStateOf((status?.nightBri ?: prefs.nightBrightness).toFloat())
-    }
+    // State variables with reactive sync
+    var clkMode by remember { mutableIntStateOf(status?.clkMode ?: 0) }
+    var dateFormat by remember { mutableIntStateOf(status?.dateFormat ?: 0) }
+    var clockIcon by remember { mutableIntStateOf(status?.clockIcon ?: 0) }
+    var textAlign by remember { mutableIntStateOf(status?.textAlign ?: 0) }
+    var showSeconds by remember { mutableStateOf(status?.showSeconds ?: false) }
+    var weekdayBar by remember { mutableStateOf(status?.weekdayBar ?: false) }
+    var weekdayStartMon by remember { mutableStateOf(status?.weekdayStartMon ?: true) }
+    var weekdayActiveColIdx by remember { mutableIntStateOf(status?.weekdayActiveColIdx ?: 0) }
+    var weekdayInactColIdx by remember { mutableIntStateOf(status?.weekdayInactColIdx ?: 0) }
+    var weekdayWeekendColIdx by remember { mutableIntStateOf(status?.weekdayWeekendColIdx ?: 0) }
 
-    // Carousel
-    var autoRotate by remember(status?.autoRotate) { mutableStateOf(status?.autoRotate ?: true) }
-    var rotateSec by remember(prefs.carouselRotateSec, status?.rotateSec) {
-        mutableFloatStateOf((status?.rotateSec ?: prefs.carouselRotateSec).toFloat())
-    }
-    var transitionFx by remember(status?.transitionFx) { mutableIntStateOf(status?.transitionFx ?: 0) }
+    var autoBri by remember { mutableStateOf(status?.autoBri ?: prefs.autoBrightness) }
+    var dayBri by remember { mutableFloatStateOf((status?.dayBri ?: prefs.dayBrightness).toFloat()) }
+    var nightMode by remember { mutableStateOf(status?.nightMode ?: false) }
+    var nightBri by remember { mutableFloatStateOf((status?.nightBri ?: prefs.nightBrightness).toFloat()) }
+    var nightStart by remember { mutableIntStateOf(status?.nightStart ?: 23) }
+    var nightEnd by remember { mutableIntStateOf(status?.nightEnd ?: 7) }
 
-    // Screen Mask Checkboxes (bitmask)
-    var maskClock by remember { mutableStateOf(true) }
-    var maskWeather by remember { mutableStateOf(true) }
-    var maskCrypto by remember { mutableStateOf(true) }
-    var maskYouTube by remember { mutableStateOf(true) }
-    var maskBattery by remember { mutableStateOf(true) }
-    var maskAmbient by remember { mutableStateOf(true) }
+    var autoRotate by remember { mutableStateOf(status?.autoRotate ?: true) }
+    var rotateSec by remember { mutableFloatStateOf((status?.rotateSec ?: prefs.carouselRotateSec).toFloat()) }
+    var transitionFx by remember { mutableIntStateOf(status?.transitionFx ?: 0) }
+    var activeApp by remember { mutableIntStateOf(status?.activeApp ?: 0) }
+    var carouselMask by remember { mutableIntStateOf(status?.carouselMask ?: 0x1FF) }
 
-    // Time & Localization
-    var timezoneStr by remember { mutableStateOf("CET-1CEST,M3.5.0,M10.5.0/3") }
-    var timeFormat24h by remember { mutableStateOf(true) }
-    var ntpServer by remember { mutableStateOf("pool.ntp.org") }
+    var batMode by remember { mutableIntStateOf(status?.batMode ?: 2) }
+    var ssStyle by remember { mutableIntStateOf(status?.screensaverStyle ?: 0) }
+    var ssTime by remember { mutableIntStateOf(status?.screensaverTimeout ?: 5) }
 
-    // Online APIs
-    var weatherCity by remember(status?.weatherCity) { mutableStateOf(status?.weatherCity ?: "Berlin,DE") }
-    var weatherKey by remember { mutableStateOf("") }
-    var cryptoSymbol by remember(status?.cryptoSymbol) { mutableStateOf(status?.cryptoSymbol ?: "BTC") }
-    var cryptoCurrency by remember { mutableStateOf("USD") }
-    var ytChannel by remember { mutableStateOf("") }
+    var weatherCity by remember { mutableStateOf(status?.weatherCity ?: "Bratislava") }
+    var weatherLat by remember { mutableFloatStateOf(status?.weatherLat ?: 48.1486f) }
+    var weatherLon by remember { mutableFloatStateOf(status?.weatherLon ?: 17.1077f) }
+    var cryptoSymbol by remember { mutableStateOf(status?.cryptoSymbol ?: "BTC") }
+    var ytChannel by remember { mutableStateOf(status?.ytChannel ?: "") }
+    var ytKey by remember { mutableStateOf("") }
 
-    // Multi-Network Wi-Fi
-    var selectedWifiSlot by remember { mutableIntStateOf(0) }
+    var mqttEn by remember { mutableStateOf(status?.mqttEn ?: false) }
+    var mqttSrv by remember { mutableStateOf(status?.mqttSrv ?: "") }
+    var mqttPort by remember { mutableIntStateOf(status?.mqttPort ?: 1883) }
+    var mqttUser by remember { mutableStateOf(status?.mqttUser ?: "") }
+    var mqttPass by remember { mutableStateOf("") }
+    var mqttPre by remember { mutableStateOf(status?.mqttPre ?: "ulanzi-tc001") }
+
+    var selectedWifiSlot by remember { mutableIntStateOf(1) } // 1..4
     var wifiSsidInput by remember { mutableStateOf("") }
     var wifiPassInput by remember { mutableStateOf("") }
 
+    // Re-sync all fields whenever status arrives from device or refreshes
+    LaunchedEffect(status) {
+        if (status != null) {
+            clkMode = status.clkMode
+            dateFormat = status.dateFormat
+            clockIcon = status.clockIcon
+            textAlign = status.textAlign
+            showSeconds = status.showSeconds
+            weekdayBar = status.weekdayBar
+            weekdayStartMon = status.weekdayStartMon
+            weekdayActiveColIdx = status.weekdayActiveColIdx
+            weekdayInactColIdx = status.weekdayInactColIdx
+            weekdayWeekendColIdx = status.weekdayWeekendColIdx
+            autoBri = status.autoBri
+            dayBri = status.dayBri.toFloat()
+            nightMode = status.nightMode
+            nightBri = status.nightBri.toFloat()
+            nightStart = status.nightStart
+            nightEnd = status.nightEnd
+            autoRotate = status.autoRotate
+            rotateSec = status.rotateSec.toFloat()
+            transitionFx = status.transitionFx
+            activeApp = status.activeApp
+            carouselMask = status.carouselMask
+            batMode = status.batMode
+            ssStyle = status.screensaverStyle ?: 0
+            ssTime = status.screensaverTimeout ?: 5
+            weatherCity = status.weatherCity ?: "Bratislava"
+            weatherLat = status.weatherLat ?: 48.1486f
+            weatherLon = status.weatherLon ?: 17.1077f
+            cryptoSymbol = status.cryptoSymbol ?: "BTC"
+            ytChannel = status.ytChannel ?: ""
+            mqttEn = status.mqttEn
+            mqttSrv = status.mqttSrv ?: ""
+            mqttPort = status.mqttPort
+            mqttUser = status.mqttUser ?: ""
+            mqttPre = status.mqttPre
+        }
+    }
+
+    val profiles = status?.wifiProfiles.takeIf { !it.isNullOrEmpty() } ?: uiState.wifiStatus?.profiles.orEmpty()
+    val currentSlotProfile = profiles.find { it.slot == selectedWifiSlot }
+
+    LaunchedEffect(selectedWifiSlot, currentSlotProfile?.ssid) {
+        wifiSsidInput = currentSlotProfile?.ssid.orEmpty()
+        wifiPassInput = ""
+    }
+
+    val saveAllAction = {
+        viewModel.saveHardwareSettings(
+            clkMode = clkMode,
+            dateFormat = dateFormat,
+            clockIcon = clockIcon,
+            textAlign = textAlign,
+            showSeconds = showSeconds,
+            weekdayBar = weekdayBar,
+            weekdayStartMon = weekdayStartMon,
+            weekdayActiveColIdx = weekdayActiveColIdx,
+            weekdayInactColIdx = weekdayInactColIdx,
+            weekdayWeekendColIdx = weekdayWeekendColIdx,
+            autoBri = autoBri,
+            dayBri = dayBri.toInt(),
+            nightMode = nightMode,
+            nightBri = nightBri.toInt(),
+            nightStart = nightStart,
+            nightEnd = nightEnd,
+            autoRotate = autoRotate,
+            rotateSec = rotateSec.toInt(),
+            transitionFx = transitionFx,
+            activeApp = activeApp,
+            carouselMask = carouselMask,
+            batMode = batMode,
+            ssStyle = ssStyle,
+            ssTime = ssTime,
+            weatherCity = weatherCity,
+            weatherLat = weatherLat,
+            weatherLon = weatherLon,
+            cryptoSymbol = cryptoSymbol,
+            ytChannel = ytChannel,
+            ytKey = ytKey.ifBlank { null },
+            mqttEn = mqttEn,
+            mqttSrv = mqttSrv,
+            mqttPort = mqttPort,
+            mqttUser = mqttUser,
+            mqttPass = mqttPass.ifBlank { null },
+            mqttPre = mqttPre,
+            wifiSlot = selectedWifiSlot,
+            wifiSsid = wifiSsidInput.ifBlank { null },
+            wifiPass = wifiPassInput.ifBlank { null }
+        )
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Section A: Illumination & Auto-Brightness
+        // Quick Action Bar
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "FIELD INSTRUMENT TERMINAL",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                        )
+                        Text(
+                            text = if (status != null) "Synchronized with clock IP: ${status.ip}" else "Offline / Connecting...",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        IconButton(onClick = { viewModel.refreshStatus(); viewModel.refreshWifi() }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Reload from Clock")
+                        }
+                        IconButton(onClick = { viewModel.rebootClock() }) {
+                            Icon(Icons.Filled.RestartAlt, contentDescription = "Reboot Device", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+                Button(
+                    onClick = saveAllAction,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("💾 Save All Settings to Clock EEPROM & Flash", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // 1. CLOCK & DATE ARCHITECTURE (Dedicated Deck)
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "1. ILLUMINATION & BRIGHTNESS",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    text = "1. CLOCK & DATE ARCHITECTURE",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                )
+
+                // Clock Mode
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("CLOCK DISPLAY MODE:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        clockModes.forEach { (m, label) ->
+                            FilterChip(
+                                selected = clkMode == m,
+                                onClick = { clkMode = m },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // Date Format & Clock Icon
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("DATE NOTATION FORMAT:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        dateFormats.forEach { (fmt, label) ->
+                            FilterChip(
+                                selected = dateFormat == fmt,
+                                onClick = { dateFormat = fmt },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("CLOCK ICON STYLE:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        clockIcons.forEach { (iconId, label) ->
+                            FilterChip(
+                                selected = clockIcon == iconId,
+                                onClick = { clockIcon = iconId },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("TEXT ALIGNMENT:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        textAlignments.forEach { (alignId, label) ->
+                            FilterChip(
+                                selected = textAlign == alignId,
+                                onClick = { textAlign = alignId },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // High Precision Seconds Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Show Seconds (HH:mm:ss)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("High-precision 3x5 seconds counter on display", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    }
+                    Switch(checked = showSeconds, onCheckedChange = { showSeconds = it })
+                }
+
+                // Weekday Bar Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Weekday Indicators (7 Micro-Bars)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Visual day indicators rendered along bottom row 7", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    }
+                    Switch(checked = weekdayBar, onCheckedChange = { weekdayBar = it })
+                }
+
+                // Weekday Customization Options
+                AnimatedVisibility(visible = weekdayBar) {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                        // Week Starting Day
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Week Starting Day:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                FilterChip(
+                                    selected = weekdayStartMon,
+                                    onClick = { weekdayStartMon = true },
+                                    label = { Text("Mon (ISO)", fontSize = 11.sp) }
+                                )
+                                FilterChip(
+                                    selected = !weekdayStartMon,
+                                    onClick = { weekdayStartMon = false },
+                                    label = { Text("Sun (US)", fontSize = 11.sp) }
+                                )
+                            }
+                        }
+
+                        // Live Weekday Bar Visualizer
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("LIVE ROW 7 INDICATOR PREVIEW:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF0B0B0A), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val days = if (weekdayStartMon) listOf("M", "T", "W", "T", "F", "S", "S") else listOf("S", "M", "T", "W", "T", "F", "S")
+                                val actCol = weekdayActiveColors.find { it.first == weekdayActiveColIdx }?.second?.second ?: Color(0xFF00F0FF)
+                                val inactCol = weekdayInactiveColors.find { it.first == weekdayInactColIdx }?.second?.second ?: Color(0xFF4A5568)
+                                val wkndCol = if (weekdayWeekendColIdx == 0) actCol else (weekendColors.find { it.first == weekdayWeekendColIdx }?.second?.second ?: actCol)
+
+                                days.forEachIndexed { idx, day ->
+                                    val isToday = (idx == 2) // demo active Wednesday
+                                    val isWeekend = if (weekdayStartMon) (idx >= 5) else (idx == 0 || idx == 6)
+                                    val barCol = when {
+                                        isToday -> actCol
+                                        isWeekend -> wkndCol
+                                        else -> inactCol
+                                    }
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(day, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = if (isToday) actCol else Color.Gray)
+                                        Box(
+                                            modifier = Modifier
+                                                .width(22.dp)
+                                                .height(5.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(barCol)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Active Day Color Palette
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("ACTIVE DAY PHOSPHOR COLOR:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                weekdayActiveColors.forEach { (idx, pair) ->
+                                    FilterChip(
+                                        selected = weekdayActiveColIdx == idx,
+                                        onClick = { weekdayActiveColIdx = idx },
+                                        leadingIcon = {
+                                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(pair.second))
+                                        },
+                                        label = { Text(pair.first, fontSize = 10.sp) }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Inactive Day Color Palette
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("INACTIVE DAY CONTRAST COLOR:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                weekdayInactiveColors.forEach { (idx, pair) ->
+                                    FilterChip(
+                                        selected = weekdayInactColIdx == idx,
+                                        onClick = { weekdayInactColIdx = idx },
+                                        leadingIcon = {
+                                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(pair.second))
+                                        },
+                                        label = { Text(pair.first, fontSize = 10.sp) }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Weekend Color Palette
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("WEEKEND PHOSPHOR COLOR:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                weekendColors.forEach { (idx, pair) ->
+                                    FilterChip(
+                                        selected = weekdayWeekendColIdx == idx,
+                                        onClick = { weekdayWeekendColIdx = idx },
+                                        leadingIcon = {
+                                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(pair.second))
+                                        },
+                                        label = { Text(pair.first, fontSize = 10.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. AMBIENT PHOTOMETRY & NIGHT CYCLE
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "2. AMBIENT PHOTOMETRY & NIGHT CYCLE",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
                 Row(
@@ -1558,46 +2023,77 @@ fun HardwareSetupDeckCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("LDR Ambient Auto-Brightness", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        Text("Adapts matrix brightness via onboard light sensor", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                        Text("Auto-Brightness via LDR Sensor", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Dynamically adapts matrix gamma via onboard light sensor", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
                     Switch(checked = autoBri, onCheckedChange = { autoBri = it })
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Daytime Brightness", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
-                        Text("${dayBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                        Text("Day Brightness Ceiling", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                        Text("${dayBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
                     }
-                    Slider(value = dayBri, onValueChange = { dayBri = it }, valueRange = 0f..100f, steps = 19)
+                    Slider(value = dayBri, onValueChange = { dayBri = it }, valueRange = 5f..100f, steps = 19)
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Nighttime Brightness", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
-                        Text("${nightBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Night Mode (Quiet Dim Red Clock)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Ultra-dim red display during quiet hours to avoid sleep disturbance", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Slider(value = nightBri, onValueChange = { nightBri = it }, valueRange = 0f..100f, steps = 19)
+                    Switch(checked = nightMode, onCheckedChange = { nightMode = it })
+                }
+
+                AnimatedVisibility(visible = nightMode) {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Night Brightness Floor", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                                Text("${nightBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
+                            }
+                            Slider(value = nightBri, onValueChange = { nightBri = it }, valueRange = 1f..25f, steps = 24)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Quiet Hours Schedule:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = nightStart.toString(),
+                                    onValueChange = { v -> v.toIntOrNull()?.let { nightStart = it.coerceIn(0, 23) } },
+                                    label = { Text("Start") },
+                                    modifier = Modifier.width(70.dp),
+                                    singleLine = true
+                                )
+                                Text("→", fontWeight = FontWeight.Bold)
+                                OutlinedTextField(
+                                    value = nightEnd.toString(),
+                                    onValueChange = { v -> v.toIntOrNull()?.let { nightEnd = it.coerceIn(0, 23) } },
+                                    label = { Text("End") },
+                                    modifier = Modifier.width(70.dp),
+                                    singleLine = true
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // Section B: Carousel & Transitions
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+        // 3. CAROUSEL ENGINE & SCREEN SEQUENCE
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "2. CAROUSEL & SCREEN TRANSITIONS",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    text = "3. CAROUSEL ENGINE & SCREEN ROTATION",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
                 Row(
@@ -1609,175 +2105,184 @@ fun HardwareSetupDeckCard(
                         Text("Auto-Rotate Carousel", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                         Text("Cycles enabled screens sequentially", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
                     Switch(checked = autoRotate, onCheckedChange = { autoRotate = it })
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Carousel Auto-Rotate Interval", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
-                        Text("${rotateSec.toInt()}s", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                        Text("Screen Dwell Interval", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                        Text("${rotateSec.toInt()}s", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
                     }
-                    Slider(value = rotateSec, onValueChange = { rotateSec = it }, valueRange = 3f..30f, steps = 26)
+                    Slider(value = rotateSec, onValueChange = { rotateSec = it }, valueRange = 3f..120f, steps = 117)
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("TRANSITION FX:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    val fxList = listOf(0 to "Instant Cut", 1 to "Smooth Slide", 2 to "Cross Fade")
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("TRANSITION ANIMATION FX:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        fxList.forEach { (fxId, label) ->
+                        transitionFxList.forEach { (fxId, label) ->
                             FilterChip(
                                 selected = transitionFx == fxId,
                                 onClick = { transitionFx = fxId },
-                                label = { Text(label, fontSize = 12.sp) }
+                                label = { Text(label, fontSize = 11.sp) }
                             )
                         }
                     }
                 }
 
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("DEFAULT ACTIVE SCREEN (WHEN PAUSED):", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        screenNames.forEach { (appId, name) ->
+                            FilterChip(
+                                selected = activeApp == appId,
+                                onClick = { activeApp = appId },
+                                label = { Text(name, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // 9 Screens in Rotation Sequence
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("SCREENS IN ROTATION MASK:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        FilterChip(
-                            selected = maskClock,
-                            onClick = { maskClock = !maskClock },
-                            leadingIcon = if (maskClock) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
-                            label = { Text("Clock", fontSize = 12.sp) }
-                        )
-                        FilterChip(
-                            selected = maskWeather,
-                            onClick = { maskWeather = !maskWeather },
-                            leadingIcon = if (maskWeather) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
-                            label = { Text("Weather", fontSize = 12.sp) }
-                        )
-                        FilterChip(
-                            selected = maskCrypto,
-                            onClick = { maskCrypto = !maskCrypto },
-                            leadingIcon = if (maskCrypto) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
-                            label = { Text("Crypto", fontSize = 12.sp) }
-                        )
-                        FilterChip(
-                            selected = maskYouTube,
-                            onClick = { maskYouTube = !maskYouTube },
-                            leadingIcon = if (maskYouTube) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
-                            label = { Text("YouTube", fontSize = 12.sp) }
-                        )
-                        FilterChip(
-                            selected = maskBattery,
-                            onClick = { maskBattery = !maskBattery },
-                            leadingIcon = if (maskBattery) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
-                            label = { Text("Battery", fontSize = 12.sp) }
-                        )
-                        FilterChip(
-                            selected = maskAmbient,
-                            onClick = { maskAmbient = !maskAmbient },
-                            leadingIcon = if (maskAmbient) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null,
-                            label = { Text("Ambient SHT30", fontSize = 12.sp) }
-                        )
+                    Text("ACTIVE SCREENS IN ROTATION SEQUENCE (9 SCREENS):", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        screenNames.forEach { (appId, name) ->
+                            val isEnabled = (carouselMask and (1 shl appId)) != 0
+                            FilterChip(
+                                selected = isEnabled,
+                                onClick = {
+                                    val newMask = carouselMask xor (1 shl appId)
+                                    carouselMask = if (newMask == 0) 0x01 else newMask
+                                },
+                                leadingIcon = if (isEnabled) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) } } else null,
+                                label = { Text(name, fontSize = 11.sp) }
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Section C: Time, Date & NTP Sync
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        // 4. BATTERY TELEMETRY FORMAT
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "3. TIMEZONE & NTP CONFIGURATION",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    text = "4. BATTERY TELEMETRY FORMAT",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
-
-                OutlinedTextField(
-                    value = timezoneStr,
-                    onValueChange = { timezoneStr = it },
-                    label = { Text("POSIX Timezone String") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                Text(
+                    text = "Configure how battery metrics are formatted on screen 6",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
-
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("CET-1CEST,M3.5.0,M10.5.0/3", "UTC0", "EST5EDT,M3.2.0,M11.1.0", "PST8PDT,M3.2.0,M11.1.0").forEach { tz ->
+                    batteryModes.forEach { (bMode, label) ->
                         FilterChip(
-                            selected = timezoneStr == tz,
-                            onClick = { timezoneStr = tz },
-                            label = { Text(tz.substringBefore(","), fontSize = 11.sp) }
+                            selected = batMode == bMode,
+                            onClick = { batMode = bMode },
+                            label = { Text(label, fontSize = 11.sp) }
                         )
                     }
                 }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("24-Hour Time Format", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        Text("Toggle between 24h (14:30) and 12h (2:30 PM)", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(checked = timeFormat24h, onCheckedChange = { timeFormat24h = it })
-                }
-
-                OutlinedTextField(
-                    value = ntpServer,
-                    onValueChange = { ntpServer = it },
-                    label = { Text("NTP Time Server Host") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
             }
         }
 
-        // Section D: Online APIs & Market Feeds
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        // 5. RETRO AMBIENT SCREENSAVER
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "4. ONLINE DATA FEEDS & API KEYS",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    text = "5. RETRO AMBIENT SCREENSAVER",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("PROCEDURAL SCREENSAVER STYLE:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        screensaverStyles.forEach { (stId, label) ->
+                            FilterChip(
+                                selected = ssStyle == stId,
+                                onClick = { ssStyle = stId },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("INACTIVITY TIMEOUT:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        screensaverTimeouts.forEach { (toMin, label) ->
+                            FilterChip(
+                                selected = ssTime == toMin,
+                                onClick = { ssTime = toMin },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. METEOROLOGICAL TELEMETRY (OPEN-METEO)
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "6. METEOROLOGICAL TELEMETRY (OPEN-METEO)",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                )
+
+                Text("PREDEFINED CITY PRESETS:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    cityPresets.forEach { (city, coords) ->
+                        FilterChip(
+                            selected = weatherCity.equals(city, ignoreCase = true),
+                            onClick = {
+                                weatherCity = city
+                                weatherLat = coords.first
+                                weatherLon = coords.second
+                            },
+                            label = { Text(city, fontSize = 11.sp) }
+                        )
+                    }
+                }
 
                 OutlinedTextField(
                     value = weatherCity,
                     onValueChange = { weatherCity = it },
-                    label = { Text("City,Country (e.g. Berlin,DE)") },
+                    label = { Text("City Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
-                OutlinedTextField(
-                    value = cryptoSymbol,
-                    onValueChange = { cryptoSymbol = it },
-                    label = { Text("Crypto Symbol (e.g. BTC, ETH)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = weatherLat.toString(),
+                        onValueChange = { v -> v.toFloatOrNull()?.let { weatherLat = it } },
+                        label = { Text("Latitude") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = weatherLon.toString(),
+                        onValueChange = { v -> v.toFloatOrNull()?.let { weatherLon = it } },
+                        label = { Text("Longitude") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                }
+            }
+        }
+
+        // 7. FINANCIAL MARKETS & CRYPTO TICKER
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "7. FINANCIAL MARKETS & CRYPTO TICKER",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
+                Text("ASSET & COMMODITY PRESETS:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("BTC", "ETH", "SOL", "BNB", "DOGE", "XRP", "TSLA", "NVDA").forEach { sym ->
+                    assetPresets.forEach { sym ->
                         FilterChip(
                             selected = cryptoSymbol.equals(sym, ignoreCase = true),
                             onClick = { cryptoSymbol = sym },
@@ -1787,145 +2292,275 @@ fun HardwareSetupDeckCard(
                 }
 
                 OutlinedTextField(
-                    value = weatherKey,
-                    onValueChange = { weatherKey = it },
-                    label = { Text("OpenWeatherMap API Key (optional)") },
+                    value = cryptoSymbol,
+                    onValueChange = { cryptoSymbol = it },
+                    label = { Text("Custom Symbol / Ticker (e.g. BTC, ETH, TSLA, GOLD, EUR)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
             }
         }
 
-        // Section E: Multi-Network Wi-Fi Memory
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        // 8. YOUTUBE CHANNEL TELEMETRY
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "8. YOUTUBE CHANNEL TELEMETRY",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                )
+
+                OutlinedTextField(
+                    value = ytChannel,
+                    onValueChange = { ytChannel = it },
+                    label = { Text("YouTube Channel ID or @Handle") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = ytKey,
+                    onValueChange = { ytKey = it },
+                    label = { Text(if (status?.ytHasKey == true) "Google Cloud API Key (Stored ✓)" else "Google Cloud API Key") },
+                    placeholder = { Text(if (status?.ytHasKey == true) "•••••••• (Leave blank to keep unchanged)" else "Enter API key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        }
+
+        // 9. HOME ASSISTANT & MQTT TELEMETRY
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "5. MULTI-NETWORK WI-FI MEMORY",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.primary
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "9. HOME ASSISTANT & MQTT",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                         )
-                    )
-                    IconButton(onClick = { viewModel.refreshWifi() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh Wi-Fi")
-                    }
-                }
-
-                Text(
-                    text = "Stores up to 4 Wi-Fi profiles in hardware flash with automatic best-signal roaming.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                )
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    for (slot in 0..3) {
-                        FilterChip(
-                            selected = selectedWifiSlot == slot,
-                            onClick = { selectedWifiSlot = slot },
-                            label = { Text("Slot #$slot", fontSize = 12.sp) }
+                        Text(
+                            text = if (status?.mqttConnected == true) "● MQTT BROKER CONNECTED" else "○ MQTT Client Offline",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (status?.mqttConnected == true) Color(0xFF00E676) else Color.Gray
+                            )
                         )
                     }
+                    Switch(checked = mqttEn, onCheckedChange = { mqttEn = it })
                 }
 
-                OutlinedTextField(
-                    value = wifiSsidInput,
-                    onValueChange = { wifiSsidInput = it },
-                    label = { Text("Slot $selectedWifiSlot SSID / Network Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                AnimatedVisibility(visible = mqttEn) {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(
+                                value = mqttSrv,
+                                onValueChange = { mqttSrv = it },
+                                label = { Text("Broker Host / IP") },
+                                modifier = Modifier.weight(2f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = mqttPort.toString(),
+                                onValueChange = { v -> v.toIntOrNull()?.let { mqttPort = it } },
+                                label = { Text("Port") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
 
-                OutlinedTextField(
-                    value = wifiPassInput,
-                    onValueChange = { wifiPassInput = it },
-                    label = { Text("Slot $selectedWifiSlot Password") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(
+                                value = mqttUser,
+                                onValueChange = { mqttUser = it },
+                                label = { Text("Username") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = mqttPass,
+                                onValueChange = { mqttPass = it },
+                                label = { Text(if (status?.mqttHasPass == true) "Password (Stored ✓)" else "Password") },
+                                placeholder = { Text(if (status?.mqttHasPass == true) "••••••••" else "") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { viewModel.connectWifiSlot(selectedWifiSlot) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Connect to Slot #$selectedWifiSlot")
+                        OutlinedTextField(
+                            value = mqttPre,
+                            onValueChange = { mqttPre = it },
+                            label = { Text("Base Topic Prefix") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
                     }
                 }
             }
         }
 
-        // Section F: Commit & Actions
+        // 10. MULTI-NETWORK WI-FI ROAMING MEMORY (4 SLOTS)
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "10. WI-FI ROAMING MEMORY (4 SLOTS)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                        )
+                        Text(
+                            text = "Stores up to 4 Wi-Fi profiles in hardware flash with auto-roaming",
+                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        )
+                    }
+                    IconButton(onClick = { viewModel.refreshWifi() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh Wi-Fi Profiles")
+                    }
+                }
+
+                // Slot selection chips
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (slot in 1..4) {
+                        val prof = profiles.find { it.slot == slot }
+                        val isConnected = prof?.isCurrentlyActive == true
+                        val hasSsid = !prof?.ssid.isNullOrBlank()
+                        val chipText = when {
+                            isConnected -> "Slot $slot: ${prof.ssid} ●"
+                            hasSsid -> "Slot $slot: ${prof.ssid}"
+                            else -> "Slot $slot (Empty)"
+                        }
+                        FilterChip(
+                            selected = selectedWifiSlot == slot,
+                            onClick = { selectedWifiSlot = slot },
+                            leadingIcon = if (isConnected) { { Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF00E676))) } } else null,
+                            label = { Text(chipText, fontSize = 11.sp, fontWeight = if (isConnected) FontWeight.Bold else FontWeight.Normal) }
+                        )
+                    }
+                }
+
+                // Selected Slot Details
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "PROFILE #$selectedWifiSlot CONFIGURATION",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            )
+                            if (currentSlotProfile?.isCurrentlyActive == true) {
+                                Text(
+                                    text = "● ACTIVE RF LINK",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E676))
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = wifiSsidInput,
+                            onValueChange = { wifiSsidInput = it },
+                            label = { Text("Slot $selectedWifiSlot SSID / Network Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = wifiPassInput,
+                            onValueChange = { wifiPassInput = it },
+                            label = { Text(if (currentSlotProfile?.hasPass == true) "Slot $selectedWifiSlot Password (Stored ✓)" else "Slot $selectedWifiSlot Password") },
+                            placeholder = { Text(if (currentSlotProfile?.hasPass == true) "•••••••• (Leave blank to keep unchanged)" else "Enter Wi-Fi password") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.connectWifiSlot(selectedWifiSlot) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Connect Slot #$selectedWifiSlot")
+                            }
+                            OutlinedButton(
+                                onClick = { viewModel.deleteWifiSlot(selectedWifiSlot) },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Clear Slot", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+
+                // Wi-Fi RF Scanner Section
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { viewModel.scanWifiNetworks() },
+                        enabled = !uiState.isScanningWifi,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        if (uiState.isScanningWifi) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Scanning RF...", fontSize = 12.sp)
+                        } else {
+                            Text("📡 Scan Nearby Wi-Fi Networks", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (uiState.scannedWifiList.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("TAP DETECTED NETWORK TO ASSIGN TO SLOT #$selectedWifiSlot:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            uiState.scannedWifiList.forEach { scanItem ->
+                                FilterChip(
+                                    selected = wifiSsidInput == scanItem.ssid,
+                                    onClick = { wifiSsidInput = scanItem.ssid },
+                                    label = { Text("${scanItem.ssid} (${scanItem.rssi} dBm)", fontSize = 11.sp) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section F: Commit & Actions Bottom Bar
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "6. COMMIT TO HARDWARE EEPROM",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    text = "COMMIT TO HARDWARE STORAGE",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
                 Button(
-                    onClick = {
-                        var mask = 0
-                        if (maskClock) mask = mask or 1
-                        if (maskWeather) mask = mask or 2
-                        if (maskCrypto) mask = mask or 4
-                        if (maskYouTube) mask = mask or 8
-                        if (maskBattery) mask = mask or 16
-                        if (maskAmbient) mask = mask or 32
-
-                        viewModel.saveHardwareSettings(
-                            dayBri = dayBri.toInt(),
-                            nightBri = nightBri.toInt(),
-                            autoBri = autoBri,
-                            rotateSec = rotateSec.toInt(),
-                            autoRotate = autoRotate,
-                            carouselMask = mask,
-                            transitionFx = transitionFx,
-                            city = weatherCity,
-                            weatherKey = weatherKey,
-                            cryptoSymbol = cryptoSymbol,
-                            cryptoCurrency = cryptoCurrency,
-                            ytChannel = ytChannel,
-                            timezone = timezoneStr,
-                            timeFormat24h = timeFormat24h,
-                            ntpServer = ntpServer,
-                            wifiSlot = if (wifiSsidInput.isNotBlank()) selectedWifiSlot else null,
-                            wifiSsid = if (wifiSsidInput.isNotBlank()) wifiSsidInput else null,
-                            wifiPass = if (wifiSsidInput.isNotBlank()) wifiPassInput else null
-                        )
-                    },
+                    onClick = saveAllAction,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("💾 Save All Settings to Clock EEPROM & Flash")
+                    Text("💾 Save All Settings to Clock EEPROM & Flash", fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -8,7 +8,9 @@ import com.hackra.ulanzi.companion.data.model.NotifyPayload
 import com.hackra.ulanzi.companion.data.model.ScreenSwitchResult
 import com.hackra.ulanzi.companion.data.model.ScreensaverResponse
 import com.hackra.ulanzi.companion.data.model.TimerResponse
+import com.hackra.ulanzi.companion.data.model.WifiProfile
 import com.hackra.ulanzi.companion.data.model.WifiResponse
+import com.hackra.ulanzi.companion.data.model.WifiScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -258,6 +260,40 @@ class UlanziApiClient(
                 .url("$baseUrl/api/wifi?connect=$slot")
                 .header("Accept", "application/json")
                 .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+            }
+        }
+    }
+
+    suspend fun scanWifi(): Result<List<WifiScanResult>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("$baseUrl/scan")
+                .header("Accept", "application/json")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                val body = response.body?.string().orEmpty()
+                json.decodeFromString<List<WifiScanResult>>(body)
+            }
+        }
+    }
+
+    suspend fun deleteWifiSlot(slot: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val formBuilder = FormBody.Builder()
+            formBuilder.add("del_wifi_$slot", "1")
+            formBuilder.add("ajax", "1")
+
+            val request = Request.Builder()
+                .url("$baseUrl/save")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .post(formBuilder.build())
                 .build()
 
             client.newCall(request).execute().use { response ->

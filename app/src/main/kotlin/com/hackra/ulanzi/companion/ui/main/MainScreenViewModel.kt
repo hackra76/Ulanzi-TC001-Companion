@@ -49,6 +49,8 @@ data class MainScreenUiState(
     val devicePreferences: DevicePreferences = DevicePreferences(),
     val selectedTab: NavigationTab = NavigationTab.DASHBOARD,
     val wifiStatus: WifiResponse? = null,
+    val scannedWifiList: List<com.hackra.ulanzi.companion.data.model.WifiScanResult> = emptyList(),
+    val isScanningWifi: Boolean = false,
     val isRebooting: Boolean = false,
     val actionMessage: String? = null
 )
@@ -62,6 +64,8 @@ class MainScreenViewModel(
 
     private val _selectedTab = MutableStateFlow(NavigationTab.DASHBOARD)
     private val _wifiStatus = MutableStateFlow<WifiResponse?>(null)
+    private val _scannedWifiList = MutableStateFlow<List<com.hackra.ulanzi.companion.data.model.WifiScanResult>>(emptyList())
+    private val _isScanningWifi = MutableStateFlow(false)
     private val _isRebooting = MutableStateFlow(false)
     private val _actionMessage = MutableStateFlow<String?>(null)
 
@@ -93,18 +97,26 @@ class MainScreenViewModel(
         devicePreferencesManager.preferences,
         _selectedTab,
         _wifiStatus,
+        _scannedWifiList,
+        _isScanningWifi
+    ) { prefs, tab, wifi, scanned, isScanning ->
+        Tuple5(prefs, tab, wifi, scanned, isScanning)
+    }
+
+    private val rebootAndMsgFlow = combine(
         _isRebooting,
         _actionMessage
-    ) { prefs, tab, wifi, isReboot, msg ->
-        ExtraUiState(prefs, tab, wifi, isReboot, msg)
+    ) { isReboot, msg ->
+        isReboot to msg
     }
 
     val uiState: StateFlow<MainScreenUiState> = combine(
         repositoryFlow,
         notificationFlow,
         mediaFlow,
-        extraFlow
-    ) { repo, notif, media, extra ->
+        extraFlow,
+        rebootAndMsgFlow
+    ) { repo, notif, media, extra, rebootMsg ->
         MainScreenUiState(
             connectionState = repo.first,
             deviceStatus = repo.second,
@@ -115,11 +127,13 @@ class MainScreenViewModel(
             notificationLogs = notif.third,
             mediaState = media.first,
             mediaSyncSettings = media.second,
-            devicePreferences = extra.prefs,
-            selectedTab = extra.tab,
-            wifiStatus = extra.wifi,
-            isRebooting = extra.isRebooting,
-            actionMessage = extra.actionMessage
+            devicePreferences = extra.first,
+            selectedTab = extra.second,
+            wifiStatus = extra.third,
+            scannedWifiList = extra.fourth,
+            isScanningWifi = extra.fifth,
+            isRebooting = rebootMsg.first,
+            actionMessage = rebootMsg.second
         )
     }.stateIn(
         scope = viewModelScope,
@@ -239,6 +253,33 @@ class MainScreenViewModel(
                 refreshWifi()
             }.onFailure {
                 _actionMessage.value = "Failed to connect to Wi-Fi slot $slot: ${it.message}"
+            }
+        }
+    }
+
+    fun scanWifiNetworks() {
+        viewModelScope.launch {
+            _isScanningWifi.value = true
+            _actionMessage.value = "Scanning nearby Wi-Fi networks from clock RF antenna..."
+            repository.scanWifi().onSuccess { results ->
+                _scannedWifiList.value = results
+                _isScanningWifi.value = false
+                _actionMessage.value = "Discovered ${results.size} nearby Wi-Fi networks!"
+            }.onFailure { err ->
+                _isScanningWifi.value = false
+                _actionMessage.value = "Wi-Fi scan failed: ${err.message}"
+            }
+        }
+    }
+
+    fun deleteWifiSlot(slot: Int) {
+        viewModelScope.launch {
+            _actionMessage.value = "Clearing Wi-Fi Profile #$slot from clock..."
+            repository.deleteWifiSlot(slot).onSuccess {
+                _actionMessage.value = "Wi-Fi Profile #$slot cleared!"
+                refreshWifi()
+            }.onFailure { err ->
+                _actionMessage.value = "Failed to clear profile #$slot: ${err.message}"
             }
         }
     }
@@ -383,66 +424,187 @@ class MainScreenViewModel(
         }
     }
 
-    // Phase 5: Hardware Settings & DataStore Persistence
+    // Hardware Settings & DataStore Persistence
     fun saveHardwareSettings(
-        dayBri: Int? = null,
-        nightBri: Int? = null,
+        // Clock & Date Architecture
+        clkMode: Int? = null,
+        dateFormat: Int? = null,
+        clockIcon: Int? = null,
+        textAlign: Int? = null,
+        showSeconds: Boolean? = null,
+        weekdayBar: Boolean? = null,
+        weekdayStartMon: Boolean? = null,
+        weekdayActiveColIdx: Int? = null,
+        weekdayInactColIdx: Int? = null,
+        weekdayWeekendColIdx: Int? = null,
+
+        // Ambient Photometry & Night Cycle
         autoBri: Boolean? = null,
-        rotateSec: Int? = null,
+        dayBri: Int? = null,
+        nightMode: Boolean? = null,
+        nightBri: Int? = null,
+        nightStart: Int? = null,
+        nightEnd: Int? = null,
+
+        // Carousel Engine & Screen Rotation
         autoRotate: Boolean? = null,
-        carouselMask: Int? = null,
+        rotateSec: Int? = null,
         transitionFx: Int? = null,
-        city: String? = null,
-        weatherKey: String? = null,
+        activeApp: Int? = null,
+        carouselMask: Int? = null,
+        carOrd: String? = null,
+
+        // Battery Telemetry & Screensaver
+        batMode: Int? = null,
+        ssStyle: Int? = null,
+        ssTime: Int? = null,
+
+        // Weather & Feeds
+        weatherCity: String? = null,
+        weatherLat: Float? = null,
+        weatherLon: Float? = null,
         cryptoSymbol: String? = null,
-        cryptoCurrency: String? = null,
         ytChannel: String? = null,
-        timezone: String? = null,
-        timeFormat24h: Boolean? = null,
-        ntpServer: String? = null,
+        ytKey: String? = null,
+
+        // Home Assistant & MQTT
+        mqttEn: Boolean? = null,
+        mqttSrv: String? = null,
+        mqttPort: Int? = null,
+        mqttUser: String? = null,
+        mqttPass: String? = null,
+        mqttPre: String? = null,
+
+        // Wi-Fi Multi-Profile Management
         wifiSlot: Int? = null,
         wifiSsid: String? = null,
-        wifiPass: String? = null
+        wifiPass: String? = null,
+        deleteWifiSlot: Int? = null
     ) {
         viewModelScope.launch {
+            val current = uiState.value.deviceStatus
+
+            val effectiveClkMode = clkMode ?: current?.clkMode ?: 0
+            val effectiveDateFmt = dateFormat ?: current?.dateFormat ?: 0
+            val effectiveClkIcon = clockIcon ?: current?.clockIcon ?: 0
+            val effectiveTextAlign = textAlign ?: current?.textAlign ?: 0
+            val effectiveShowSec = showSeconds ?: current?.showSeconds ?: false
+            val effectiveWdBar = weekdayBar ?: current?.weekdayBar ?: false
+            val effectiveWdMon = weekdayStartMon ?: current?.weekdayStartMon ?: true
+            val effectiveWdAcol = weekdayActiveColIdx ?: current?.weekdayActiveColIdx ?: 0
+            val effectiveWdIcol = weekdayInactColIdx ?: current?.weekdayInactColIdx ?: 0
+            val effectiveWdWcol = weekdayWeekendColIdx ?: current?.weekdayWeekendColIdx ?: 0
+
+            val effectiveAutoBri = autoBri ?: current?.autoBri ?: true
+            val effectiveDayBri = dayBri ?: current?.dayBri ?: 35
+            val effectiveNightMode = nightMode ?: current?.nightMode ?: false
+            val effectiveNightBri = nightBri ?: current?.nightBri ?: 2
+            val effectiveNightStart = nightStart ?: current?.nightStart ?: 23
+            val effectiveNightEnd = nightEnd ?: current?.nightEnd ?: 7
+
+            val effectiveAutoRotate = autoRotate ?: current?.autoRotate ?: true
+            val effectiveRotate = rotateSec ?: current?.rotateSec ?: 8
+            val effectiveTransFx = transitionFx ?: current?.transitionFx ?: 0
+            val effectiveActiveApp = activeApp ?: current?.activeApp ?: 0
+            val effectiveMask = carouselMask ?: current?.carouselMask ?: 0x1FF
+            val effectiveCarOrd = carOrd ?: current?.carOrd ?: "0,1,2,3,4,5,6,7,8"
+
+            val effectiveBatMode = batMode ?: current?.batMode ?: 2
+            val effectiveSsStyle = ssStyle ?: current?.screensaverStyle ?: 0
+            val effectiveSsTime = ssTime ?: current?.screensaverTimeout ?: 5
+
+            val effectiveCity = weatherCity ?: current?.weatherCity ?: "Bratislava"
+            val effectiveLat = weatherLat ?: current?.weatherLat ?: 48.1486f
+            val effectiveLon = weatherLon ?: current?.weatherLon ?: 17.1077f
+            val effectiveCrypto = cryptoSymbol ?: current?.cryptoSymbol ?: "BTC"
+            val effectiveYtChannel = ytChannel ?: current?.ytChannel ?: ""
+            val effectiveMqttEn = mqttEn ?: current?.mqttEn ?: false
+            val effectiveMqttSrv = mqttSrv ?: current?.mqttSrv ?: ""
+            val effectiveMqttPort = mqttPort ?: current?.mqttPort ?: 1883
+            val effectiveMqttUser = mqttUser ?: current?.mqttUser ?: ""
+            val effectiveMqttPre = mqttPre ?: current?.mqttPre ?: "ulanzi-tc001"
+
             val params = mutableMapOf<String, String>()
-            dayBri?.let { params["day_bri"] = it.toString() }
-            nightBri?.let { params["night_bri"] = it.toString() }
-            autoBri?.let { params["auto_bri"] = if (it) "1" else "0" }
-            rotateSec?.let { params["rotate_sec"] = it.toString() }
-            autoRotate?.let { params["auto_rotate"] = if (it) "1" else "0" }
-            carouselMask?.let { params["carousel_mask"] = it.toString() }
-            transitionFx?.let { params["transition_fx"] = it.toString() }
-            city?.let { if (it.isNotBlank()) params["city"] = it }
-            weatherKey?.let { if (it.isNotBlank()) params["weather_key"] = it }
-            cryptoSymbol?.let { if (it.isNotBlank()) params["crypto_symbol"] = it }
-            cryptoCurrency?.let { if (it.isNotBlank()) params["crypto_currency"] = it }
-            ytChannel?.let { if (it.isNotBlank()) params["yt_channel"] = it }
-            timezone?.let { if (it.isNotBlank()) params["timezone"] = it }
-            timeFormat24h?.let { params["time_format"] = if (it) "24" else "12" }
-            ntpServer?.let { if (it.isNotBlank()) params["ntp_server"] = it }
-            if (wifiSlot != null && !wifiSsid.isNullOrBlank()) {
-                params["slot"] = wifiSlot.toString()
-                params["ssid"] = wifiSsid
-                if (!wifiPass.isNullOrBlank()) params["pass"] = wifiPass
+
+            // 1. Clock & Date Architecture
+            params["clk_mode"] = effectiveClkMode.toString()
+            params["date_fmt"] = effectiveDateFmt.toString()
+            params["clk_icon"] = effectiveClkIcon.toString()
+            params["txt_align"] = effectiveTextAlign.toString()
+            if (effectiveShowSec) params["show_sec"] = "1"
+            if (effectiveWdBar) params["wd_bar"] = "1"
+            params["wd_mon"] = if (effectiveWdMon) "1" else "0"
+            params["wd_acol"] = effectiveWdAcol.toString()
+            params["wd_icol"] = effectiveWdIcol.toString()
+            params["wd_wcol"] = effectiveWdWcol.toString()
+
+            // 2. Ambient Photometry & Night Cycle
+            if (effectiveAutoBri) params["auto_bri"] = "1"
+            params["day_bri"] = effectiveDayBri.coerceIn(5, 100).toString()
+            if (effectiveNightMode) params["night_mode"] = "1"
+            params["night_bri"] = effectiveNightBri.coerceIn(1, 25).toString()
+            params["night_start"] = effectiveNightStart.coerceIn(0, 23).toString()
+            params["night_end"] = effectiveNightEnd.coerceIn(0, 23).toString()
+
+            // 3. Carousel Engine & Screen Rotation
+            if (effectiveAutoRotate) params["auto_rotate"] = "1"
+            params["rotate"] = effectiveRotate.coerceIn(3, 120).toString()
+            params["trans_fx"] = effectiveTransFx.coerceIn(0, 7).toString()
+            params["active_app"] = effectiveActiveApp.coerceIn(0, 8).toString()
+            params["car_ord"] = effectiveCarOrd
+            for (i in 0..8) {
+                if ((effectiveMask and (1 shl i)) != 0) {
+                    params["car_app_$i"] = "1"
+                }
             }
 
-            if (params.isNotEmpty()) {
-                val res = repository.saveSettings(params)
-                if (res.isSuccess) {
-                    _actionMessage.value = "Hardware EEPROM settings saved to clock!"
-                } else {
-                    _actionMessage.value = "Failed to save settings: ${res.exceptionOrNull()?.message}"
+            // 4. Battery Telemetry & Screensaver
+            params["bat_mode"] = effectiveBatMode.toString()
+            params["ss_style"] = effectiveSsStyle.toString()
+            params["ss_time"] = effectiveSsTime.toString()
+
+            // 5. Weather & Feeds
+            params["w_city"] = effectiveCity
+            params["w_lat"] = effectiveLat.toString()
+            params["w_lon"] = effectiveLon.toString()
+            params["c_sym_custom"] = effectiveCrypto
+
+            // 6. YouTube
+            if (effectiveYtChannel.isNotBlank()) params["yt_channel"] = effectiveYtChannel
+            if (!ytKey.isNullOrBlank()) params["yt_key"] = ytKey
+
+            // 7. MQTT & Home Assistant
+            if (effectiveMqttEn) params["mqtt_en"] = "1"
+            if (effectiveMqttSrv.isNotBlank()) params["mqtt_srv"] = effectiveMqttSrv
+            params["mqtt_port"] = effectiveMqttPort.toString()
+            if (effectiveMqttUser.isNotBlank()) params["mqtt_user"] = effectiveMqttUser
+            if (!mqttPass.isNullOrBlank()) params["mqtt_pass"] = mqttPass
+            params["mqtt_pre"] = effectiveMqttPre
+
+            // 8. Wi-Fi Multi-Profile Management
+            if (deleteWifiSlot != null && deleteWifiSlot in 1..4) {
+                params["del_wifi_$deleteWifiSlot"] = "1"
+            } else if (wifiSlot != null && !wifiSsid.isNullOrBlank() && wifiSlot in 1..4) {
+                val ssidKey = if (wifiSlot == 1) "ssid" else "ssid_$wifiSlot"
+                val passKey = if (wifiSlot == 1) "password" else "password_$wifiSlot"
+                params[ssidKey] = wifiSsid
+                if (!wifiPass.isNullOrBlank()) {
+                    params[passKey] = wifiPass
                 }
-                if (dayBri != null || nightBri != null || autoBri != null) {
-                    val current = uiState.value.devicePreferences
-                    devicePreferencesManager.setHardwareBrightnessDefaults(
-                        dayBri = dayBri ?: current.dayBrightness,
-                        nightBri = nightBri ?: current.nightBrightness,
-                        autoBri = autoBri ?: current.autoBrightness
-                    )
-                }
-                rotateSec?.let { devicePreferencesManager.setCarouselRotateSec(it) }
+            }
+
+            val res = repository.saveSettings(params)
+            if (res.isSuccess) {
+                _actionMessage.value = "Hardware EEPROM settings saved to clock!"
+                devicePreferencesManager.setHardwareBrightnessDefaults(
+                    dayBri = effectiveDayBri,
+                    nightBri = effectiveNightBri,
+                    autoBri = effectiveAutoBri
+                )
+                devicePreferencesManager.setCarouselRotateSec(effectiveRotate)
+                refreshWifi()
+            } else {
+                _actionMessage.value = "Failed to save settings: ${res.exceptionOrNull()?.message}"
             }
         }
     }
@@ -464,12 +626,6 @@ class MainScreenViewModel(
     }
 }
 
+private data class Tuple5<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
 private data class Tuple4<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 private data class Tuple3<A, B, C>(val first: A, val second: B, val third: C)
-private data class ExtraUiState(
-    val prefs: DevicePreferences,
-    val tab: NavigationTab,
-    val wifi: WifiResponse?,
-    val isRebooting: Boolean,
-    val actionMessage: String?
-)

@@ -14,6 +14,7 @@ import com.hackra.ulanzi.companion.data.model.ScreenSwitchResult
 import com.hackra.ulanzi.companion.data.model.ScreensaverResponse
 import com.hackra.ulanzi.companion.data.model.TimerResponse
 import com.hackra.ulanzi.companion.data.model.WifiResponse
+import com.hackra.ulanzi.companion.data.model.WifiScanResult
 import com.hackra.ulanzi.companion.data.network.UlanziApiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +53,9 @@ interface UlanziRepository {
     suspend fun controlTimer(action: String, mode: String? = null, duration: Int? = null): Result<TimerResponse>
     suspend fun controlScreensaver(style: Int? = null, timeout: Int? = null, action: String? = null): Result<ScreensaverResponse>
     suspend fun getWifiStatus(): Result<WifiResponse>
+    suspend fun scanWifi(): Result<List<WifiScanResult>>
     suspend fun connectWifiSlot(slot: Int): Result<Unit>
+    suspend fun deleteWifiSlot(slot: Int): Result<Unit>
     suspend fun saveSettings(params: Map<String, String>): Result<Unit>
     suspend fun rebootDevice(): Result<Unit>
 }
@@ -178,9 +181,21 @@ class DefaultUlanziRepository(
     override suspend fun getWifiStatus(): Result<WifiResponse> =
         apiClient.getWifiStatus()
 
+    override suspend fun scanWifi(): Result<List<WifiScanResult>> =
+        apiClient.scanWifi()
+
     override suspend fun connectWifiSlot(slot: Int): Result<Unit> {
         val res = apiClient.connectWifiSlot(slot)
         res.onSuccess { refreshStatus() }
+        return res
+    }
+
+    override suspend fun deleteWifiSlot(slot: Int): Result<Unit> {
+        val res = apiClient.deleteWifiSlot(slot)
+        res.onSuccess {
+            refreshStatus()
+            getWifiStatus()
+        }
         return res
     }
 

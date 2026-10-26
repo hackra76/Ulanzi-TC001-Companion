@@ -171,8 +171,8 @@ class MainScreenViewModelTest {
         viewModel.saveHardwareSettings(dayBri = 80, nightBri = 15, autoBri = false, rotateSec = 12)
         assertEquals("80", repo.lastSavedSettings?.get("day_bri"))
         assertEquals("15", repo.lastSavedSettings?.get("night_bri"))
-        assertEquals("0", repo.lastSavedSettings?.get("auto_bri"))
-        assertEquals("12", repo.lastSavedSettings?.get("rotate_sec"))
+        assertEquals(null, repo.lastSavedSettings?.get("auto_bri")) // Unchecked checkboxes are omitted in form POST
+        assertEquals("12", repo.lastSavedSettings?.get("rotate"))
 
         assertEquals(80, prefsManager.preferences.value.dayBrightness)
         assertEquals(15, prefsManager.preferences.value.nightBrightness)
@@ -210,41 +210,70 @@ class MainScreenViewModelTest {
         val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
 
         viewModel.saveHardwareSettings(
+            clkMode = 1,
+            dateFormat = 2,
+            clockIcon = 0,
+            textAlign = 1,
+            showSeconds = true,
+            weekdayBar = true,
+            weekdayStartMon = false,
+            weekdayActiveColIdx = 2,
+            weekdayInactColIdx = 5,
+            weekdayWeekendColIdx = 1,
             dayBri = 75,
             nightBri = 5,
             autoBri = true,
+            nightMode = true,
+            nightStart = 22,
+            nightEnd = 6,
             rotateSec = 10,
-            autoRotate = false,
-            carouselMask = 63,
+            autoRotate = true,
+            carouselMask = 0x07, // apps 0, 1, 2
             transitionFx = 1,
-            city = "Prague,CZ",
+            weatherCity = "Prague",
+            weatherLat = 50.0755f,
+            weatherLon = 14.4378f,
             cryptoSymbol = "SOL",
-            cryptoCurrency = "EUR",
-            timezone = "CET-1CEST",
-            timeFormat24h = true,
-            ntpServer = "time.cloudflare.com",
+            ytChannel = "@test",
+            mqttEn = true,
+            mqttSrv = "192.168.1.100",
+            mqttPort = 1883,
             wifiSlot = 1,
             wifiSsid = "Office-5G",
             wifiPass = "secretpass"
         )
 
         val saved = repo.lastSavedSettings
+        assertEquals("1", saved?.get("clk_mode"))
+        assertEquals("2", saved?.get("date_fmt"))
+        assertEquals("0", saved?.get("clk_icon"))
+        assertEquals("1", saved?.get("txt_align"))
+        assertEquals("1", saved?.get("show_sec"))
+        assertEquals("1", saved?.get("wd_bar"))
+        assertEquals("0", saved?.get("wd_mon"))
+        assertEquals("2", saved?.get("wd_acol"))
         assertEquals("75", saved?.get("day_bri"))
         assertEquals("5", saved?.get("night_bri"))
         assertEquals("1", saved?.get("auto_bri"))
-        assertEquals("10", saved?.get("rotate_sec"))
-        assertEquals("0", saved?.get("auto_rotate"))
-        assertEquals("63", saved?.get("carousel_mask"))
-        assertEquals("1", saved?.get("transition_fx"))
-        assertEquals("Prague,CZ", saved?.get("city"))
-        assertEquals("SOL", saved?.get("crypto_symbol"))
-        assertEquals("EUR", saved?.get("crypto_currency"))
-        assertEquals("CET-1CEST", saved?.get("timezone"))
-        assertEquals("24", saved?.get("time_format"))
-        assertEquals("time.cloudflare.com", saved?.get("ntp_server"))
-        assertEquals("1", saved?.get("slot"))
+        assertEquals("1", saved?.get("night_mode"))
+        assertEquals("22", saved?.get("night_start"))
+        assertEquals("6", saved?.get("night_end"))
+        assertEquals("10", saved?.get("rotate"))
+        assertEquals("1", saved?.get("auto_rotate"))
+        assertEquals("1", saved?.get("car_app_0"))
+        assertEquals("1", saved?.get("car_app_1"))
+        assertEquals("1", saved?.get("car_app_2"))
+        assertEquals(null, saved?.get("car_app_3"))
+        assertEquals("1", saved?.get("trans_fx"))
+        assertEquals("Prague", saved?.get("w_city"))
+        assertEquals("50.0755", saved?.get("w_lat"))
+        assertEquals("14.4378", saved?.get("w_lon"))
+        assertEquals("SOL", saved?.get("c_sym_custom"))
+        assertEquals("@test", saved?.get("yt_channel"))
+        assertEquals("1", saved?.get("mqtt_en"))
+        assertEquals("192.168.1.100", saved?.get("mqtt_srv"))
         assertEquals("Office-5G", saved?.get("ssid"))
-        assertEquals("secretpass", saved?.get("pass"))
+        assertEquals("secretpass", saved?.get("password"))
     }
 }
 
@@ -282,7 +311,9 @@ private class FakeUlanziRepository : UlanziRepository {
         return Result.success(ScreensaverResponse())
     }
     override suspend fun getWifiStatus(): Result<WifiResponse> = Result.success(WifiResponse())
+    override suspend fun scanWifi(): Result<List<com.hackra.ulanzi.companion.data.model.WifiScanResult>> = Result.success(emptyList())
     override suspend fun connectWifiSlot(slot: Int): Result<Unit> = Result.success(Unit)
+    override suspend fun deleteWifiSlot(slot: Int): Result<Unit> = Result.success(Unit)
     override suspend fun saveSettings(params: Map<String, String>): Result<Unit> {
         lastSavedSettings = params
         return Result.success(Unit)

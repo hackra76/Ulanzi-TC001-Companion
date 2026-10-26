@@ -4,7 +4,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.2.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.0-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.2-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
@@ -13,21 +13,28 @@ Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry
 
 ---
 
-## 📑 Feature Matrix & Web Portal Parity
+## 📑 Feature Matrix & 100% Web Portal Parity
 
 | Feature | ESP32 Web Portal | Android Companion App | Notes |
 | :--- | :---: | :---: | :--- |
+| **Live Device State Loading** | ✅ | ✅ | Automatically reads active configuration from `/status` and `/api/wifi` |
 | **Live 32×8 Matrix Mirror** | ✅ | ✅ | Real-time NeoPixel stream with high-contrast LED rendering |
 | **Real-time Telemetry Deck** | ✅ | ✅ | SHT30 Temp & Humidity, Battery Gauge %, Volts, RSSI dBm, LDR |
-| **9-Screen Rapid Switcher** | ✅ | ✅ | Clock, Weather, Crypto, YouTube, Battery, SHT30, Timer, Screensaver, Wi-Fi |
-| **Carousel & Auto-Rotate** | ✅ | ✅ | Toggle rotation, configure cycle (3s–30s), transition FX (Instant, Slide, Fade) |
-| **Screen Rotation Mask** | ✅ | ✅ | Bitmask checkboxes to include/exclude individual screens |
-| **Hardware Countdown / Stopwatch** | ✅ | ✅ | Mode selector, digital simulation readout, 1m/3m/5m/10m/15m/25m Pomodoro |
-| **Ambient Screensavers** | ✅ | ✅ | 5 styles (Matrix Rain, Starfield, Fire, Retro Clock, Plasma Flow) + timeout |
-| **Multi-Network Wi-Fi Memory** | ✅ | ✅ | 4 profile slots, slot roaming, credential editor, connection switcher |
-| **LDR Auto-Brightness & Limits** | ✅ | ✅ | Sensor-driven auto-brightness, daytime slider (0–100%), nighttime slider |
-| **Timezone & NTP Sync** | ✅ | ✅ | POSIX timezone string, 12h/24h toggle, custom NTP server |
-| **Online APIs & Market Feeds** | ✅ | ✅ | OpenWeatherMap City & API key, CoinGecko Crypto symbol & currency, YouTube |
+| **Clock & Date Architecture** | ✅ | ✅ | Clock mode, date format, icon style, alignment, HH:mm:ss seconds |
+| **7-Day Weekday Indicators** | ✅ | ✅ | 11 active phosphor colors, 10 inactive, 11 weekend, live row 7 preview |
+| **9-Screen Rapid Switcher** | ✅ | ✅ | Clock, Indoor SHT30, Weather, Crypto, YouTube, Airspace, Battery, Timer, Screensaver |
+| **Carousel & Auto-Rotate** | ✅ | ✅ | Auto-rotate, cycle interval (3s–120s), 8 transition effects (Slide, Curtain, Dissolve, etc.) |
+| **9-Screen Rotation Mask** | ✅ | ✅ | Bitmask checkboxes to include/exclude any of the 9 firmware screens |
+| **Ambient & Night Cycle** | ✅ | ✅ | LDR Auto-brightness, day ceiling (5–100%), quiet red night mode & hours schedule |
+| **Battery Telemetry Format** | ✅ | ✅ | Alternating (% & V every 3s), Percentage Only, Voltage Only |
+| **Hardware Timer / Stopwatch** | ✅ | ✅ | Mode selector, digital simulation readout, 1m/3m/5m/10m/15m/25m Pomodoro |
+| **Ambient Screensavers** | ✅ | ✅ | 5 styles (Matrix Rain, Fire, Pac-Man, Game of Life, Dynamic Shuffle) + timeout |
+| **Multi-Profile Wi-Fi (4 Slots)** | ✅ | ✅ | 4 profile slots, slot roaming, credential editor, 1-tap connect, 1-tap clear |
+| **Wi-Fi RF Scanner** | ✅ | ✅ | Scan nearby APs via clock antenna and assign to any slot |
+| **Meteorological Telemetry** | ✅ | ✅ | Open-Meteo city presets (Bratislava, Prague, Vienna, Berlin, London, NY) & coords |
+| **Financial Markets & Crypto** | ✅ | ✅ | Asset presets (BTC, ETH, SOL, BNB, AAPL, TSLA, NVDA, SPX, GOLD) + custom ticker |
+| **YouTube Channel Telemetry** | ✅ | ✅ | Channel @handle / ID & Google Cloud API key |
+| **Home Assistant & MQTT** | ✅ | ✅ | Auto-discovery switch, broker IP/port, auth, topic prefix, live status |
 | **Remote Hardware Reboot** | ✅ | ✅ | Instant `/reboot` trigger with automated reconnect handshake |
 | **Android Push Notifications** | ❌ | ✅ **Exclusive** | Background `NotificationListenerService` forwarding calls, SMS, WhatsApp, etc. |
 | **Spotify / Media Broadcaster** | ❌ | ✅ **Exclusive** | Live track title, artist, progress bar streaming via `/api/custom` |
@@ -106,14 +113,46 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
 - In-app permission detection, quick system settings launcher, and live event stream ticker.
 - Manual alert tester to compose and push custom notifications with icon and sound.
 
-### 5. Hardware EEPROM Configuration Deck (Web Portal Replacement)
-- Permanent clock configuration updates via `/save` committed directly to ESP32 EEPROM flash.
-- **Illumination & Auto-Brightness**: LDR ambient auto-brightness toggle, daytime slider (0–100%), nighttime slider (0–100%).
-- **Carousel & Transitions**: Auto-rotate toggle, rotate cycle slider (3s–30s), transition FX selector (0: Instant Cut, 1: Smooth Slide, 2: Cross Fade), screen rotation mask checkboxes.
-- **Time & Localization**: POSIX timezone string (with quick presets for CET/CEST, UTC, EST, PST), 12h/24h toggle, NTP server.
-- **Online Feeds**: OpenWeatherMap city & API key, CoinGecko crypto symbol & currency, YouTube channel ID.
-- **Multi-Network Wi-Fi Memory**: Multi-slot profile switcher and credential editor.
-- **Device Operations**: One-tap commit to EEPROM flash, remote hardware reboot, and auto-reconnect switch.
+### 5. Hardware EEPROM Configuration Deck (100% Web Portal Replacement)
+- Permanent clock configuration updates committed directly to ESP32 EEPROM/NVS flash via `/save`, with automatic initial state synchronization from `/status`.
+- **Clock & Date Architecture**:
+  - Clock Display Mode (Time Only, Combined Alternating, Date Only).
+  - Date Notation Formats (DD.MM., DD MMM, MM/DD, DAY DD).
+  - Clock Icon Styles (Dynamic Calendar 1-31, Classic Heart, Clock Face, None).
+  - Text Alignment (Left-Aligned with Icon vs Centered in Window).
+  - High-precision seconds counter switch (`show_sec` -> HH:mm:ss).
+  - 7 Weekday indicator micro-bars along row 7 (`wd_bar`) with week start day (Monday ISO vs Sunday US).
+  - Weekday Phosphor Color Palettes with real-time row 7 visualizer preview:
+    - 11 Active Day Colors (Cyan, Orange, Green, Yellow, Red, White, Magenta, Electric Blue, Lime Green, Amber Gold, Soft Pink).
+    - 10 Inactive Day Colors (Dim Auto, Slate Gray, Dim Amber, Dark Blue, Deep Wine, Forest Green, Charcoal, Muted Purple, Dark Cyan, Off).
+    - 11 Weekend Colors (Same as Active, Bright Red, Coral Orange, Gold, Hot Pink, Purple, Cyan, Lime, Pure White, Sky Blue, Emerald).
+- **Ambient Photometry & Night Cycle**:
+  - LDR ambient auto-brightness toggle, daytime slider ceiling (5–100%).
+  - Night Mode switch (ultra-dim red clock for dark environments).
+  - Nighttime brightness floor slider (1–25%).
+  - Quiet hours schedule start and end (0–23h).
+- **Carousel Engine & Screen Sequence**:
+  - Auto-rotate toggle and cycle dwell interval slider (3s–120s).
+  - 8 Screen transition FX (Instant Cut, Slide Left, Slide Right, Slide Up, Slide Down, Crossfade, Curtain Wipe, Random FX).
+  - 9-screen rotation mask bitmask checkboxes (Clock, Indoor SHT30, Weather, Crypto, YouTube, Airspace Radar, Battery, Timer, Screensaver).
+- **Battery Telemetry Format**:
+  - Alternating (% and Voltage every 3s), Percentage Only, Voltage Only.
+- **Retro Ambient Screensaver**:
+  - 5 procedural styles (Matrix Digital Rain, NeoPixel Fire, Pac-Man, Conway's Game of Life, Dynamic Shuffle).
+  - Inactivity timeout selector (Disabled, 1m, 2m, 5m, 10m, 15m, 30m).
+- **Meteorological Telemetry (Open-Meteo)**:
+  - 13 Predefined European & worldwide city presets with auto-filling latitude and longitude.
+- **Financial Markets & Crypto Ticker**:
+  - Asset presets (BTC, ETH, SOL, BNB, AAPL, TSLA, NVDA, SPX, GOLD, EUR, USD) + custom ticker override.
+- **YouTube Channel Telemetry**:
+  - Creator channel handle / ID and Google Cloud Data API key.
+- **Home Assistant & MQTT Auto-Discovery**:
+  - Auto-discovery switch, broker IP/port, auth, topic prefix, and live MQTT connection status badge.
+- **Multi-Network Wi-Fi Memory (4 Slots)**:
+  - 4 hardware flash profile slots with best-signal roaming.
+  - Active RF link badges and stored password indicators.
+  - 1-tap connect, 1-tap clear, and onboard Wi-Fi RF scanner detecting nearby SSIDs.
+- **Device Operations**: One-tap commit to EEPROM flash, remote hardware reboot, and "Reload from Device" re-synchronization.
 
 ---
 

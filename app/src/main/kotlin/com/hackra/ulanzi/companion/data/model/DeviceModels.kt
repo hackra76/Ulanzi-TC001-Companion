@@ -38,7 +38,34 @@ data class DeviceStatus(
     @SerialName("timer_elapsed_ms") val timerElapsedMs: Long? = null,
     @SerialName("screensaver_style") val screensaverStyle: Int? = null,
     @SerialName("screensaver_timeout") val screensaverTimeout: Int? = null,
-    @SerialName("screensaver_active") val screensaverActive: Boolean? = null
+    @SerialName("screensaver_active") val screensaverActive: Boolean? = null,
+    @SerialName("car_ord") val carOrd: String? = null,
+    @SerialName("bat_mode") val batMode: Int = 0,
+    @SerialName("clk_mode") val clkMode: Int = 0,
+    @SerialName("show_sec") val showSeconds: Boolean = false,
+    @SerialName("wd_bar") val weekdayBar: Boolean = false,
+    @SerialName("wd_mon") val weekdayStartMon: Boolean = true,
+    @SerialName("wd_acol") val weekdayActiveColIdx: Int = 0,
+    @SerialName("wd_icol") val weekdayInactColIdx: Int = 0,
+    @SerialName("wd_wcol") val weekdayWeekendColIdx: Int = 0,
+    @SerialName("date_fmt") val dateFormat: Int = 0,
+    @SerialName("clk_icon") val clockIcon: Int = 0,
+    @SerialName("txt_align") val textAlign: Int = 0,
+    @SerialName("night_start") val nightStart: Int = 23,
+    @SerialName("night_end") val nightEnd: Int = 7,
+    @SerialName("weather_lat") val weatherLat: Float? = null,
+    @SerialName("weather_lon") val weatherLon: Float? = null,
+    @SerialName("yt_channel") val ytChannel: String? = null,
+    @SerialName("yt_has_key") val ytHasKey: Boolean = false,
+    @SerialName("mqtt_en") val mqttEn: Boolean = false,
+    @SerialName("mqtt_srv") val mqttSrv: String? = null,
+    @SerialName("mqtt_port") val mqttPort: Int = 1883,
+    @SerialName("mqtt_user") val mqttUser: String? = null,
+    @SerialName("mqtt_has_pass") val mqttHasPass: Boolean = false,
+    @SerialName("mqtt_pre") val mqttPre: String = "ulanzi-tc001",
+    @SerialName("ui_lang") val uiLang: String? = null,
+    @SerialName("mqtt_connected") val mqttConnected: Boolean = false,
+    @SerialName("wifi_profiles") val wifiProfiles: List<WifiProfile> = emptyList()
 )
 
 @Serializable
@@ -95,8 +122,11 @@ data class WifiProfile(
     @SerialName("slot") val slot: Int,
     @SerialName("ssid") val ssid: String = "",
     @SerialName("has_pass") val hasPass: Boolean = false,
-    @SerialName("connected") val connected: Boolean = false
-)
+    @SerialName("connected") val connected: Boolean = false,
+    @SerialName("active") val active: Boolean = false
+) {
+    val isCurrentlyActive: Boolean get() = connected || active
+}
 
 @Serializable
 data class WifiResponse(
@@ -111,4 +141,11 @@ data class WifiResponse(
 data class GenericStatusResponse(
     @SerialName("status") val status: String = "ok",
     @SerialName("app") val app: String? = null
+)
+
+@Serializable
+data class WifiScanResult(
+    @SerialName("ssid") val ssid: String = "",
+    @SerialName("rssi") val rssi: Int = 0,
+    @SerialName("secure") val secure: Boolean = false
 )
