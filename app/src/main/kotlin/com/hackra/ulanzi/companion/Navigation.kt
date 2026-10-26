@@ -13,7 +13,7 @@ fun MainNavigation() {
     val backStack = rememberNavBackStack(Main)
     val app = UlanziCompanionApp.get()
     val viewModel: MainScreenViewModel = viewModel {
-        MainScreenViewModel(app.repository, app.notificationSettingsManager)
+        MainScreenViewModel(app.repository, app.notificationSettingsManager, app.mediaSyncManager)
     }
 
     NavDisplay(

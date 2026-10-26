@@ -22,6 +22,8 @@ class MainActivity : ComponentActivity() {
 
   override fun onResume() {
     super.onResume()
-    UlanziCompanionApp.get().notificationSettingsManager.refreshPermission()
+    val app = runCatching { UlanziCompanionApp.get() }.getOrNull()
+    app?.notificationSettingsManager?.refreshPermission()
+    app?.mediaSyncManager?.refreshActiveSessions()
   }
 }

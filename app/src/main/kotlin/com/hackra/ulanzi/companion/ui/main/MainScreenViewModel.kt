@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.hackra.ulanzi.companion.data.ConnectionState
 import com.hackra.ulanzi.companion.data.UlanziRepository
 import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
+import com.hackra.ulanzi.companion.data.media.MediaPlaybackState
+import com.hackra.ulanzi.companion.data.media.MediaSyncManager
+import com.hackra.ulanzi.companion.data.media.MediaSyncSettings
+import com.hackra.ulanzi.companion.data.media.MediaTextFormat
 import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
@@ -27,12 +31,15 @@ data class MainScreenUiState(
     val notificationSettings: NotificationSettings = NotificationSettings(),
     val hasListenerPermission: Boolean = false,
     val notificationLogs: List<ForwardedNotificationLog> = emptyList(),
+    val mediaState: MediaPlaybackState = MediaPlaybackState(),
+    val mediaSyncSettings: MediaSyncSettings = MediaSyncSettings(),
     val actionMessage: String? = null
 )
 
 class MainScreenViewModel(
     private val repository: UlanziRepository,
-    private val notificationSettingsManager: NotificationSettingsManager
+    private val notificationSettingsManager: NotificationSettingsManager,
+    private val mediaSyncManager: MediaSyncManager
 ) : ViewModel() {
 
     private val repositoryFlow = combine(
@@ -52,10 +59,18 @@ class MainScreenViewModel(
         Tuple3(settings, perm, logs)
     }
 
+    private val mediaFlow = combine(
+        mediaSyncManager.mediaState,
+        mediaSyncManager.settings
+    ) { media, settings ->
+        media to settings
+    }
+
     val uiState: StateFlow<MainScreenUiState> = combine(
         repositoryFlow,
-        notificationFlow
-    ) { repo, notif ->
+        notificationFlow,
+        mediaFlow
+    ) { repo, notif, media ->
         MainScreenUiState(
             connectionState = repo.first,
             deviceStatus = repo.second,
@@ -63,7 +78,9 @@ class MainScreenViewModel(
             discoveryState = repo.fourth,
             notificationSettings = notif.first,
             hasListenerPermission = notif.second,
-            notificationLogs = notif.third
+            notificationLogs = notif.third,
+            mediaState = media.first,
+            mediaSyncSettings = media.second
         )
     }.stateIn(
         scope = viewModelScope,
@@ -75,7 +92,9 @@ class MainScreenViewModel(
             discoveryState = repository.discoveryState.value,
             notificationSettings = notificationSettingsManager.settings.value,
             hasListenerPermission = notificationSettingsManager.hasListenerPermission.value,
-            notificationLogs = notificationSettingsManager.logs.value
+            notificationLogs = notificationSettingsManager.logs.value,
+            mediaState = mediaSyncManager.mediaState.value,
+            mediaSyncSettings = mediaSyncManager.settings.value
         )
     )
 
@@ -179,6 +198,47 @@ class MainScreenViewModel(
 
     fun clearNotificationLogs() {
         notificationSettingsManager.clearLogs()
+    }
+
+    // Media Player & Spotify Live Broadcaster methods (Phase 3)
+    fun setMediaSyncEnabled(enabled: Boolean) {
+        mediaSyncManager.setSyncEnabled(enabled)
+    }
+
+    fun setMediaAutoSwitch(autoSwitch: Boolean) {
+        mediaSyncManager.setAutoSwitch(autoSwitch)
+    }
+
+    fun setMediaDeleteOnPause(deleteOnPause: Boolean) {
+        mediaSyncManager.setDeleteOnPause(deleteOnPause)
+    }
+
+    fun setMediaPushInterval(intervalSec: Int) {
+        mediaSyncManager.setPushInterval(intervalSec)
+    }
+
+    fun setMediaFormat(format: MediaTextFormat) {
+        mediaSyncManager.setFormat(format)
+    }
+
+    fun mediaPlay() {
+        mediaSyncManager.play()
+    }
+
+    fun mediaPause() {
+        mediaSyncManager.pause()
+    }
+
+    fun mediaSkipNext() {
+        mediaSyncManager.skipNext()
+    }
+
+    fun mediaSkipPrevious() {
+        mediaSyncManager.skipPrevious()
+    }
+
+    fun forceSyncMedia() {
+        mediaSyncManager.triggerSyncToClock()
     }
 }
 

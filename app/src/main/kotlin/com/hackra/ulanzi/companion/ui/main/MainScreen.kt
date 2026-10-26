@@ -65,6 +65,9 @@ import com.hackra.ulanzi.companion.data.discovery.DiscoveredDevice
 import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
+import com.hackra.ulanzi.companion.data.media.MediaPlaybackState
+import com.hackra.ulanzi.companion.data.media.MediaSyncSettings
+import com.hackra.ulanzi.companion.data.media.MediaTextFormat
 import com.hackra.ulanzi.companion.data.notification.ForwardedNotificationLog
 import com.hackra.ulanzi.companion.data.notification.NotificationDispatchStatus
 import com.hackra.ulanzi.companion.data.notification.NotificationSettings
@@ -169,6 +172,12 @@ fun MainScreen(
 
             // 4. Notification Forwarding Service (Phase 2)
             NotificationForwardingDeckCard(
+                uiState = uiState,
+                viewModel = viewModel
+            )
+
+            // 5. Media Player & Spotify Live Broadcaster (Phase 3)
+            MediaSyncDeckCard(
                 uiState = uiState,
                 viewModel = viewModel
             )
@@ -995,3 +1004,314 @@ fun NotificationForwardingDeckCard(
         }
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun MediaSyncDeckCard(
+    uiState: MainScreenUiState,
+    viewModel: MainScreenViewModel
+) {
+    val mediaState = uiState.mediaState
+    val settings = uiState.mediaSyncSettings
+    val hasPermission = uiState.hasListenerPermission
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "NOW PLAYING MEDIA SYNC",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "Spotify & Media Session Broadcaster",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+
+                // Status Badge
+                val (badgeBg, badgeText) = when {
+                    !hasPermission -> Color(0xFFB71C1C) to "ACCESS NEEDED"
+                    !settings.isEnabled -> Color(0xFF424242) to "DISABLED"
+                    mediaState.isPlaying -> Color(0xFF1B5E20) to "PLAYING"
+                    mediaState.title.isNotBlank() -> Color(0xFF4A3800) to "PAUSED"
+                    else -> Color(0xFF37474F) to "IDLE"
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgeBg)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                }
+            }
+
+            // Master Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Broadcast Active Media to Clock",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                    Text(
+                        text = "Streams track, artist & bottom progress bar via /api/custom",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+                Switch(
+                    checked = settings.isEnabled,
+                    onCheckedChange = { viewModel.setMediaSyncEnabled(it) },
+                    enabled = hasPermission
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Active Track Player Card
+            if (mediaState.title.isNotBlank() || mediaState.artist.isNotBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // App source and play state indicator
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(if (mediaState.isPlaying) Color(0xFF00E676) else Color(0xFFFFD600))
+                                )
+                                Text(
+                                    text = mediaState.appName.ifBlank { "Media Player" }.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            }
+
+                            Text(
+                                text = "${mediaState.progressPct}%",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+
+                        // Track title & artist
+                        Column {
+                            Text(
+                                text = mediaState.title.ifBlank { "Unknown Title" },
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1
+                            )
+                            Text(
+                                text = mediaState.artist.ifBlank { "Unknown Artist" },
+                                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                                maxLines = 1
+                            )
+                            if (mediaState.album.isNotBlank() && mediaState.album != mediaState.title) {
+                                Text(
+                                    text = mediaState.album,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    ),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        // Progress Bar & Duration
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LinearProgressIndicator(
+                                progress = { (mediaState.progressPct / 100f).coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = mediaState.positionFormatted,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                                Text(
+                                    text = mediaState.durationFormatted,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
+
+                        // Interactive Media Transport Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.mediaSkipPrevious() },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("⏮")
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (mediaState.isPlaying) viewModel.mediaPause() else viewModel.mediaPlay()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(if (mediaState.isPlaying) "⏸ Pause" else "▶ Play")
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.mediaSkipNext() },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("⏭")
+                            }
+
+                            Button(
+                                onClick = { viewModel.forceSyncMedia() },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) {
+                                Text("⚡ Push")
+                            }
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No active media playback detected.\nStart playing music in Spotify or YouTube Music to stream live tracks.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Sync Interval & Format Controls
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "PROGRESS REFRESH INTERVAL:",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                val intervals = listOf(3 to "3s (Fast)", 5 to "5s (Balanced)", 10 to "10s (Eco)")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    intervals.forEach { (sec, label) ->
+                        FilterChip(
+                            selected = settings.pushIntervalSec == sec,
+                            onClick = { viewModel.setMediaPushInterval(sec) },
+                            label = { Text(label, fontSize = 12.sp) }
+                        )
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "MATRIX TEXT FORMAT:",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = settings.format == MediaTextFormat.TITLE_ARTIST,
+                        onClick = { viewModel.setMediaFormat(MediaTextFormat.TITLE_ARTIST) },
+                        label = { Text("Title • Artist", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = settings.format == MediaTextFormat.ARTIST_TITLE,
+                        onClick = { viewModel.setMediaFormat(MediaTextFormat.ARTIST_TITLE) },
+                        label = { Text("Artist - Title", fontSize = 12.sp) }
+                    )
+                }
+            }
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = settings.deleteOnPause,
+                    onClick = { viewModel.setMediaDeleteOnPause(!settings.deleteOnPause) },
+                    label = { Text("Clear Clock Screen on Pause") }
+                )
+            }
+        }
+    }
+}
+

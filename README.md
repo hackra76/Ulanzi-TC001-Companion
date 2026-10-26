@@ -19,7 +19,12 @@ Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock
   - Granular category filtering, suppression of ongoing/persistent notifications (music players, download bars), and 2.5-second duplicate debounce cache.
   - Automatic 8×8 pixel icon mapping (`bell`, `mail`, `clock`, `spotify`, `warning`, `heart`), acoustic buzzer chime (0-3), and configurable display duration.
   - In-app permission detection, quick system settings launcher, and live event stream ticker.
-- **🎵 Now Playing Media Sync**: Broadcasts real-time media player metadata (Spotify, YouTube Music, podcasts) with artist, title, smooth scrolling ticker, and bottom progress bar (`/api/custom`).
+- **🎵 Now Playing Media Player & Spotify Live Broadcaster (Phase 3)**:
+  - Background `MediaSessionManager` listener detecting active playback from Spotify, YouTube Music, Apple Music, podcasts, and local players.
+  - Real-time track title, artist, album, duration, and live progress percentage streamed directly to the matrix display via `POST /api/custom?name=spotify`.
+  - Brand-specific adaptive pixel styling (Spotify Green `#1ED760`, YouTube Red, Cyan) with 8×8 Spotify icon and dynamic bottom progress bar.
+  - Interactive tactile media transport deck in app (Play, Pause, Skip Next, Skip Previous, and Instant Push).
+  - Configurable update intervals (3s Realtime, 5s Balanced, 10s Eco), marquee formatting options (`Title • Artist` vs `Artist - Title`), and optional auto-clean on pause (`DELETE /api/custom`).
 - **🎛️ Remote Navigation & Controls**: Switch screens on the fly, toggle carousel auto-rotation, start/pause/reset stopwatch & countdown timers, and trigger ambient screensavers.
 - **📊 Live Telemetry & Quick Adjustments**: View real-time indoor temperature & humidity (Sensirion SHT30), battery level/voltage, Wi-Fi RSSI, and adjust day/night brightness.
 

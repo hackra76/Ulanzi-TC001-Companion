@@ -12,6 +12,10 @@ import com.hackra.ulanzi.companion.data.model.ScreenSwitchResult
 import com.hackra.ulanzi.companion.data.model.ScreensaverResponse
 import com.hackra.ulanzi.companion.data.model.TimerResponse
 import com.hackra.ulanzi.companion.data.model.WifiResponse
+import com.hackra.ulanzi.companion.data.media.MediaPlaybackState
+import com.hackra.ulanzi.companion.data.media.MediaSyncManager
+import com.hackra.ulanzi.companion.data.media.MediaSyncSettings
+import com.hackra.ulanzi.companion.data.media.MediaTextFormat
 import com.hackra.ulanzi.companion.data.notification.NotificationSettings
 import com.hackra.ulanzi.companion.data.notification.NotificationSettingsManager
 import junit.framework.TestCase.assertEquals
@@ -26,18 +30,22 @@ import org.junit.Test
 class MainScreenViewModelTest {
     @Test
     fun uiState_initiallyDisconnected() = runTest {
+        val repo = FakeUlanziRepository()
         val notifManager = NotificationSettingsManager()
-        val viewModel = MainScreenViewModel(FakeUlanziRepository(), notifManager)
+        val mediaManager = MediaSyncManager(repo)
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager)
         assertEquals(ConnectionState.Disconnected, viewModel.uiState.first().connectionState)
     }
 
     @Test
     fun notificationSettings_updatesProperly() = runTest {
+        val repo = FakeUlanziRepository()
         val notifManager = NotificationSettingsManager(
             initialSettings = NotificationSettings(isForwardingEnabled = false),
             initialHasPermission = true
         )
-        val viewModel = MainScreenViewModel(FakeUlanziRepository(), notifManager)
+        val mediaManager = MediaSyncManager(repo)
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager)
         assertEquals(false, viewModel.uiState.value.notificationSettings.isForwardingEnabled)
         assertTrue(viewModel.uiState.value.hasListenerPermission)
 
@@ -49,6 +57,32 @@ class MainScreenViewModelTest {
 
         viewModel.setNotificationDuration(12)
         assertEquals(12, notifManager.settings.value.duration)
+    }
+
+    @Test
+    fun mediaSyncSettings_updatesProperly() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(
+            repository = repo,
+            initialSettings = MediaSyncSettings(isEnabled = false, pushIntervalSec = 5),
+            initialPlaybackState = MediaPlaybackState(title = "Starlight", artist = "Muse", isPlaying = true, progressPct = 42)
+        )
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager)
+
+        assertEquals("Starlight", viewModel.uiState.value.mediaState.title)
+        assertEquals("Muse", viewModel.uiState.value.mediaState.artist)
+        assertEquals(42, viewModel.uiState.value.mediaState.progressPct)
+        assertEquals(false, viewModel.uiState.value.mediaSyncSettings.isEnabled)
+
+        viewModel.setMediaSyncEnabled(true)
+        assertEquals(true, mediaManager.settings.value.isEnabled)
+
+        viewModel.setMediaPushInterval(10)
+        assertEquals(10, mediaManager.settings.value.pushIntervalSec)
+
+        viewModel.setMediaFormat(MediaTextFormat.ARTIST_TITLE)
+        assertEquals(MediaTextFormat.ARTIST_TITLE, mediaManager.settings.value.format)
     }
 }
 

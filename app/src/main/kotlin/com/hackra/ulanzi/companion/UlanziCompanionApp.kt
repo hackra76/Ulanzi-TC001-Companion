@@ -3,6 +3,7 @@ package com.hackra.ulanzi.companion
 import android.app.Application
 import com.hackra.ulanzi.companion.data.DefaultUlanziRepository
 import com.hackra.ulanzi.companion.data.UlanziRepository
+import com.hackra.ulanzi.companion.data.media.MediaSyncManager
 import com.hackra.ulanzi.companion.data.network.UlanziApiClient
 import com.hackra.ulanzi.companion.data.notification.NotificationSettingsManager
 
@@ -17,6 +18,9 @@ class UlanziCompanionApp : Application() {
     lateinit var notificationSettingsManager: NotificationSettingsManager
         private set
 
+    lateinit var mediaSyncManager: MediaSyncManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -24,6 +28,7 @@ class UlanziCompanionApp : Application() {
         apiClient = UlanziApiClient()
         repository = DefaultUlanziRepository(this, apiClient)
         notificationSettingsManager = NotificationSettingsManager(this)
+        mediaSyncManager = MediaSyncManager(this, repository, notificationSettingsManager)
     }
 
     companion object {
