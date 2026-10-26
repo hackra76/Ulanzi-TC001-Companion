@@ -1,5 +1,6 @@
 package com.hackra.ulanzi.companion.data.network
 
+import com.hackra.ulanzi.companion.data.model.CanvasPayload
 import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
@@ -82,6 +83,37 @@ class UlanziApiClient(
                 if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
                 val body = response.body?.string().orEmpty()
                 json.decodeFromString<DisplayMatrixResponse>(body)
+            }
+        }
+    }
+
+    suspend fun sendCanvasPixels(
+        pixels: List<List<String>>,
+        durationSec: Int = 60
+    ): Result<GenericStatusResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            val payload = CanvasPayload(pixels = pixels, duration = durationSec)
+            val bodyJson = json.encodeToString(CanvasPayload.serializer(), payload)
+            val request = Request.Builder()
+                .url("$baseUrl/api/display")
+                .post(bodyJson.toRequestBody(jsonMediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val fallbackReq = Request.Builder()
+                        .url("$baseUrl/api/draw")
+                        .post(bodyJson.toRequestBody(jsonMediaType))
+                        .build()
+                    client.newCall(fallbackReq).execute().use { fallbackResp ->
+                        if (!fallbackResp.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                        val body = fallbackResp.body?.string().orEmpty()
+                        json.decodeFromString<GenericStatusResponse>(body)
+                    }
+                } else {
+                    val body = response.body?.string().orEmpty()
+                    json.decodeFromString<GenericStatusResponse>(body)
+                }
             }
         }
     }

@@ -46,6 +46,7 @@ interface UlanziRepository {
 
     suspend fun refreshStatus(): Result<DeviceStatus>
     suspend fun refreshDisplayMatrix(): Result<DisplayMatrixResponse>
+    suspend fun sendCanvasPixels(pixels: List<List<String>>, durationSec: Int = 60): Result<GenericStatusResponse>
     suspend fun switchScreen(appIndex: Int, autoRotate: Boolean? = null): Result<ScreenSwitchResult>
     suspend fun sendNotification(payload: NotifyPayload): Result<GenericStatusResponse>
     suspend fun pushCustomApp(name: String, payload: CustomAppPayload): Result<GenericStatusResponse>
@@ -150,6 +151,9 @@ class DefaultUlanziRepository(
         res.onSuccess { _displayMatrix.value = it }
         return res
     }
+
+    override suspend fun sendCanvasPixels(pixels: List<List<String>>, durationSec: Int): Result<GenericStatusResponse> =
+        apiClient.sendCanvasPixels(pixels, durationSec)
 
     override suspend fun switchScreen(appIndex: Int, autoRotate: Boolean?): Result<ScreenSwitchResult> {
         val res = apiClient.switchScreen(appIndex, autoRotate)

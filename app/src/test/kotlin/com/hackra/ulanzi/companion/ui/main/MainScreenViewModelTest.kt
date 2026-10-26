@@ -275,6 +275,69 @@ class MainScreenViewModelTest {
         assertEquals("Office-5G", saved?.get("ssid"))
         assertEquals("secretpass", saved?.get("password"))
     }
+
+    @Test
+    fun canvasStudio_drawPixel_and_tools() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        // Initial default state
+        assertEquals(DashboardViewMode.LIVE_STREAM, viewModel.uiState.value.dashboardViewMode)
+        viewModel.setDashboardViewMode(DashboardViewMode.CANVAS_STUDIO)
+        assertEquals(DashboardViewMode.CANVAS_STUDIO, viewModel.uiState.value.dashboardViewMode)
+
+        // Draw pixel with PEN
+        viewModel.setCanvasSelectedColor("#00E676")
+        viewModel.drawPixel(5, 2)
+        assertEquals("#00E676", viewModel.uiState.value.canvasPixels[2][5])
+
+        // Draw with ERASER
+        viewModel.setCanvasTool(CanvasTool.ERASER)
+        viewModel.drawPixel(5, 2)
+        assertEquals("#000000", viewModel.uiState.value.canvasPixels[2][5])
+
+        // Clear canvas
+        viewModel.setCanvasTool(CanvasTool.PEN)
+        viewModel.drawPixel(0, 0)
+        viewModel.clearCanvas()
+        assertEquals("#000000", viewModel.uiState.value.canvasPixels[0][0])
+
+        // Fill canvas
+        viewModel.fillCanvas("#2979FF")
+        assertEquals("#2979FF", viewModel.uiState.value.canvasPixels[7][31])
+    }
+
+    @Test
+    fun canvasStudio_loadPreset_and_sendToClock() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        viewModel.loadCanvasPreset("pacman")
+        // Pacman has yellow pixels
+        assertTrue(viewModel.uiState.value.canvasPixels.any { row -> row.contains("#FFD600") })
+
+        viewModel.setCanvasDuration(30)
+        assertEquals(30, viewModel.uiState.value.canvasDisplayDurationSec)
+
+        viewModel.sendCanvasToClock()
+        assertEquals(30, repo.lastSentDuration)
+        assertEquals(8, repo.lastSentPixels?.size)
+        assertEquals(32, repo.lastSentPixels?.get(0)?.size)
+    }
 }
 
 private class FakeUlanziRepository : UlanziRepository {
@@ -286,6 +349,8 @@ private class FakeUlanziRepository : UlanziRepository {
     var lastTimerCall: Triple<String, String?, Int?>? = null
     var lastScreensaverCall: Triple<Int?, Int?, String?>? = null
     var lastSavedSettings: Map<String, String>? = null
+    var lastSentPixels: List<List<String>>? = null
+    var lastSentDuration: Int? = null
 
     override fun startDiscovery(scope: CoroutineScope) {}
     override fun stopDiscovery() {}
@@ -294,6 +359,11 @@ private class FakeUlanziRepository : UlanziRepository {
 
     override suspend fun refreshStatus(): Result<DeviceStatus> = Result.success(DeviceStatus())
     override suspend fun refreshDisplayMatrix(): Result<DisplayMatrixResponse> = Result.success(DisplayMatrixResponse())
+    override suspend fun sendCanvasPixels(pixels: List<List<String>>, durationSec: Int): Result<GenericStatusResponse> {
+        lastSentPixels = pixels
+        lastSentDuration = durationSec
+        return Result.success(GenericStatusResponse(status = "ok"))
+    }
     override suspend fun switchScreen(appIndex: Int, autoRotate: Boolean?): Result<ScreenSwitchResult> =
         Result.success(ScreenSwitchResult(activeApp = appIndex))
     override suspend fun sendNotification(payload: NotifyPayload): Result<GenericStatusResponse> =

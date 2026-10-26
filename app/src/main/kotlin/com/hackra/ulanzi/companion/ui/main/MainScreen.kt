@@ -6,9 +6,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,16 +33,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FormatColorFill
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -52,6 +63,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -63,6 +76,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -149,8 +163,10 @@ fun MainScreen(
                                     letterSpacing = 0.8.sp
                                 )
                             )
+                            val fwVer = uiState.deviceStatus?.firmwareVersion?.let { if (it.startsWith("v", ignoreCase = true)) it else "v$it" }
+                            val subTitle = if (fwVer != null) "FW $fwVer • $statusText" else statusText
                             Text(
-                                text = "FW v2.2.0 • $statusText",
+                                text = subTitle,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = FontFamily.Monospace,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -346,26 +362,82 @@ fun DashboardTabContent(
 ) {
     val status = uiState.deviceStatus
 
-    // Live Display Matrix
-    LiveMatrixCard(
-        matrix = uiState.displayMatrix,
-        onRefresh = { viewModel.refreshStatus() }
-    )
+    // Top Segmented Switcher: Live Stream vs. Pixel Canvas Studio
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        val isLive = uiState.dashboardViewMode == DashboardViewMode.LIVE_STREAM
+        Button(
+            onClick = { viewModel.setDashboardViewMode(DashboardViewMode.LIVE_STREAM) },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isLive) MaterialTheme.colorScheme.primary else Color.Transparent,
+                contentColor = if (isLive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            shape = RoundedCornerShape(8.dp),
+            elevation = null
+        ) {
+            Icon(Icons.Filled.Dashboard, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                "Live Stream",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (isLive) FontWeight.Bold else FontWeight.Normal)
+            )
+        }
 
-    // Live Telemetry Deck
-    if (status != null) {
-        TelemetryDeckCard(status = status)
+        val isCanvas = uiState.dashboardViewMode == DashboardViewMode.CANVAS_STUDIO
+        Button(
+            onClick = { viewModel.setDashboardViewMode(DashboardViewMode.CANVAS_STUDIO) },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isCanvas) MaterialTheme.colorScheme.primary else Color.Transparent,
+                contentColor = if (isCanvas) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            shape = RoundedCornerShape(8.dp),
+            elevation = null
+        ) {
+            Icon(Icons.Filled.Brush, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                "Pixel Canvas",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (isCanvas) FontWeight.Bold else FontWeight.Normal)
+            )
+        }
     }
 
-    // Rapid 9-Screen Switcher
-    ScreenSwitcherCard(
-        activeApp = status?.activeApp ?: 0,
-        autoRotate = status?.autoRotate ?: true,
-        onSwitch = { appIdx -> viewModel.switchScreen(appIdx) },
-        onToggleAutoRotate = { viewModel.toggleAutoRotate(it) },
-        onStepNext = { viewModel.stepScreenNext() },
-        onStepPrev = { viewModel.stepScreenPrev() }
-    )
+    if (uiState.dashboardViewMode == DashboardViewMode.LIVE_STREAM) {
+        // Live Display Matrix
+        LiveMatrixCard(
+            matrix = uiState.displayMatrix,
+            onRefresh = { viewModel.refreshStatus() }
+        )
+
+        // Live Telemetry Deck
+        if (status != null) {
+            TelemetryDeckCard(status = status)
+        }
+
+        // Rapid 9-Screen Switcher
+        ScreenSwitcherCard(
+            activeApp = status?.activeApp ?: 0,
+            autoRotate = status?.autoRotate ?: true,
+            onSwitch = { appIdx -> viewModel.switchScreen(appIdx) },
+            onToggleAutoRotate = { viewModel.toggleAutoRotate(it) },
+            onStepNext = { viewModel.stepScreenNext() },
+            onStepPrev = { viewModel.stepScreenPrev() }
+        )
+    } else {
+        // Interactive Pixel Canvas Studio
+        InteractivePixelCanvasCard(
+            uiState = uiState,
+            viewModel = viewModel
+        )
+    }
 }
 
 // -------------------------------------------------------------
@@ -535,6 +607,347 @@ fun LiveMatrixCard(
                                 fontFamily = FontFamily.Monospace
                             )
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun InteractivePixelCanvasCard(
+    uiState: MainScreenUiState,
+    viewModel: MainScreenViewModel
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "32×8 NEOPIXEL CANVAS STUDIO",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "Touch, drag, or stamp pixel art directly to matrix",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+            }
+
+            // Interactive 32x8 Grid Box
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(32f / 8f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF0A0E14))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .padding(4.dp)
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(uiState.canvasTool, uiState.canvasSelectedColor) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    val cellW = size.width / 32f
+                                    val cellH = size.height / 8f
+                                    val x = (offset.x / cellW).toInt().coerceIn(0, 31)
+                                    val y = (offset.y / cellH).toInt().coerceIn(0, 7)
+                                    viewModel.drawPixel(x, y)
+                                },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    val cellW = size.width / 32f
+                                    val cellH = size.height / 8f
+                                    val x = (change.position.x / cellW).toInt().coerceIn(0, 31)
+                                    val y = (change.position.y / cellH).toInt().coerceIn(0, 7)
+                                    viewModel.drawPixel(x, y)
+                                }
+                            )
+                        }
+                        .pointerInput(uiState.canvasTool, uiState.canvasSelectedColor) {
+                            detectTapGestures { offset ->
+                                val cellW = size.width / 32f
+                                val cellH = size.height / 8f
+                                val x = (offset.x / cellW).toInt().coerceIn(0, 31)
+                                val y = (offset.y / cellH).toInt().coerceIn(0, 7)
+                                viewModel.drawPixel(x, y)
+                            }
+                        }
+                ) {
+                    val cellW = size.width / 32f
+                    val cellH = size.height / 8f
+                    val gapX = cellW * 0.14f
+                    val gapY = cellH * 0.14f
+                    val dotW = cellW - gapX
+                    val dotH = cellH - gapY
+                    val corner = CornerRadius(minOf(dotW, dotH) * 0.25f)
+
+                    for (y in 0 until 8) {
+                        val row = uiState.canvasPixels.getOrNull(y).orEmpty()
+                        for (x in 0 until 32) {
+                            val hex = row.getOrNull(x) ?: "#000000"
+                            val color = try {
+                                Color(android.graphics.Color.parseColor(hex))
+                            } catch (_: Exception) {
+                                Color(0xFF14181F)
+                            }
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(
+                                    x * cellW + gapX / 2f,
+                                    y * cellH + gapY / 2f
+                                ),
+                                size = Size(dotW, dotH),
+                                cornerRadius = corner
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Tool Selection & Active Color Indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Tools (Pen, Eraser, Bucket)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = uiState.canvasTool == CanvasTool.PEN,
+                        onClick = { viewModel.setCanvasTool(CanvasTool.PEN) },
+                        label = { Text("Pen") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Brush, contentDescription = "Pen", modifier = Modifier.size(16.dp))
+                        }
+                    )
+                    FilterChip(
+                        selected = uiState.canvasTool == CanvasTool.ERASER,
+                        onClick = { viewModel.setCanvasTool(CanvasTool.ERASER) },
+                        label = { Text("Eraser") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.CleaningServices, contentDescription = "Eraser", modifier = Modifier.size(16.dp))
+                        }
+                    )
+                    FilterChip(
+                        selected = uiState.canvasTool == CanvasTool.BUCKET,
+                        onClick = { viewModel.setCanvasTool(CanvasTool.BUCKET) },
+                        label = { Text("Fill") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.FormatColorFill, contentDescription = "Bucket Fill", modifier = Modifier.size(16.dp))
+                        }
+                    )
+                }
+
+                // Display Active Color Preview
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val activeColor = try {
+                        Color(android.graphics.Color.parseColor(uiState.canvasSelectedColor))
+                    } catch (_: Exception) {
+                        Color.White
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(activeColor)
+                            .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    )
+                    Text(
+                        text = uiState.canvasSelectedColor,
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace)
+                    )
+                }
+            }
+
+            // Vibrant Color Palette Swatches
+            val paletteColors = listOf(
+                "#FF0055", "#FF3333", "#FF9100", "#FFD600",
+                "#00E676", "#00C853", "#00E5FF", "#2979FF",
+                "#7C4DFF", "#D500F9", "#FFFFFF", "#808080", "#000000"
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                paletteColors.forEach { hex ->
+                    val isSelected = uiState.canvasSelectedColor.equals(hex, ignoreCase = true)
+                    val swatchColor = try {
+                        Color(android.graphics.Color.parseColor(hex))
+                    } catch (_: Exception) {
+                        Color.DarkGray
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(swatchColor)
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                shape = CircleShape
+                            )
+                            .clickable {
+                                viewModel.setCanvasSelectedColor(hex)
+                                if (uiState.canvasTool == CanvasTool.ERASER) {
+                                    viewModel.setCanvasTool(CanvasTool.PEN)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            val checkTint = if (hex == "#FFFFFF" || hex == "#FFD600" || hex == "#00E5FF" || hex == "#00E676") Color.Black else Color.White
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = checkTint,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // Built-in Presets Stamps
+            Text(
+                text = "RETRO PRESETS & STAMPS",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "heart" to "❤️ Love",
+                    "pacman" to "👻 Pac-Man",
+                    "space_invaders" to "👾 Invader",
+                    "vu_meter" to "📊 Equalizer",
+                    "rainbow" to "🌈 Rainbow",
+                    "fire" to "🔥 Flame",
+                    "smiley" to "😎 Shades"
+                ).forEach { (presetKey, label) ->
+                    OutlinedButton(
+                        onClick = { viewModel.loadCanvasPreset(presetKey) },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // Display Duration selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Matrix Display Duration:",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(15, 30, 60, 180).forEach { sec ->
+                        FilterChip(
+                            selected = uiState.canvasDisplayDurationSec == sec,
+                            onClick = { viewModel.setCanvasDuration(sec) },
+                            label = { Text("${sec}s", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+            }
+
+            // Action Buttons
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Primary Send Button
+                Button(
+                    onClick = { viewModel.sendCanvasToClock() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isSendingCanvas && uiState.connectionState is ConnectionState.Connected,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    if (uiState.isSendingCanvas) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Rendering on Hardware...")
+                    } else {
+                        Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (uiState.connectionState is ConnectionState.Connected) "Send to Clock Matrix" else "Connect Clock First",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Secondary Utility Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Clone from Clock Live Display
+                    OutlinedButton(
+                        onClick = { viewModel.grabDisplayToCanvas() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Clone Clock", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    // Clear Canvas
+                    OutlinedButton(
+                        onClick = { viewModel.clearCanvas() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Clear All", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    // Fill All
+                    OutlinedButton(
+                        onClick = { viewModel.fillCanvas(uiState.canvasSelectedColor) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.FormatColorFill, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Fill All", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -1611,6 +2024,216 @@ private val batteryModes = listOf(
     1 to "Voltage Only"
 )
 
+@Composable
+fun <T> CompactDropdownSelector(
+    label: String,
+    items: List<Pair<T, String>>,
+    selectedValue: T,
+    onValueChange: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: (@Composable () -> Unit)? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentLabel = items.find { it.first == selectedValue }?.second ?: selectedValue.toString()
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedCard(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        leadingIcon?.invoke()
+                        Text(
+                            text = currentLabel,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Dropdown",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.9f)
+            ) {
+                items.forEach { (value, itemLabel) ->
+                    val isSelected = value == selectedValue
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = itemLabel,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        },
+                        trailingIcon = if (isSelected) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else null,
+                        onClick = {
+                            onValueChange(value)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ColorDropdownPicker(
+    label: String,
+    items: List<Pair<Int, Pair<String, Color>>>,
+    selectedIdx: Int,
+    onColorSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentItem = items.find { it.first == selectedIdx } ?: items.firstOrNull()
+    val currentColor = currentItem?.second?.second ?: Color.White
+    val currentName = currentItem?.second?.first ?: "Color"
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedCard(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(currentColor)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                        )
+                        Text(
+                            text = currentName,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Select Color",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.85f)
+            ) {
+                items.forEach { (idx, pair) ->
+                    val name = pair.first
+                    val color = pair.second
+                    val isSelected = idx == selectedIdx
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = name,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        },
+                        trailingIcon = if (isSelected) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else null,
+                        onClick = {
+                            onColorSelected(idx)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HardwareSetupDeckCard(
@@ -1835,67 +2458,52 @@ fun HardwareSetupDeckCard(
             }
         }
 
-        // 1. CLOCK & DATE ARCHITECTURE (Dedicated Deck)
+        val cityDropdownItems = remember { cityPresets.map { it.first to it.first } }
+        val assetDropdownItems = remember { assetPresets.map { it to it } }
+
+        // 1. CLOCK & DISPLAY ARCHITECTURE
         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "1. CLOCK & DATE ARCHITECTURE",
+                    text = "1. CLOCK & DISPLAY ARCHITECTURE",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
-                // Clock Mode
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("CLOCK DISPLAY MODE:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        clockModes.forEach { (m, label) ->
-                            FilterChip(
-                                selected = clkMode == m,
-                                onClick = { clkMode = m },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactDropdownSelector(
+                        label = "CLOCK MODE",
+                        items = clockModes,
+                        selectedValue = clkMode,
+                        onValueChange = { clkMode = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    CompactDropdownSelector(
+                        label = "DATE NOTATION",
+                        items = dateFormats,
+                        selectedValue = dateFormat,
+                        onValueChange = { dateFormat = it },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
-                // Date Format & Clock Icon
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("DATE NOTATION FORMAT:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        dateFormats.forEach { (fmt, label) ->
-                            FilterChip(
-                                selected = dateFormat == fmt,
-                                onClick = { dateFormat = fmt },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactDropdownSelector(
+                        label = "CLOCK ICON",
+                        items = clockIcons,
+                        selectedValue = clockIcon,
+                        onValueChange = { clockIcon = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    CompactDropdownSelector(
+                        label = "TEXT ALIGNMENT",
+                        items = textAlignments,
+                        selectedValue = textAlign,
+                        onValueChange = { textAlign = it },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("CLOCK ICON STYLE:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        clockIcons.forEach { (iconId, label) ->
-                            FilterChip(
-                                selected = clockIcon == iconId,
-                                onClick = { clockIcon = iconId },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("TEXT ALIGNMENT:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        textAlignments.forEach { (alignId, label) ->
-                            FilterChip(
-                                selected = textAlign == alignId,
-                                onClick = { textAlign = alignId },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                 // High Precision Seconds Toggle
                 Row(
@@ -1905,7 +2513,7 @@ fun HardwareSetupDeckCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Show Seconds (HH:mm:ss)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        Text("High-precision 3x5 seconds counter on display", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                        Text("High-precision 3×5 seconds counter on display", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
                     Switch(checked = showSeconds, onCheckedChange = { showSeconds = it })
                 }
@@ -1918,15 +2526,15 @@ fun HardwareSetupDeckCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Weekday Indicators (7 Micro-Bars)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        Text("Visual day indicators rendered along bottom row 7", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                        Text("Row 7 visual status indicators for day of the week", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
                     Switch(checked = weekdayBar, onCheckedChange = { weekdayBar = it })
                 }
 
-                // Weekday Customization Options
+                // Weekday Customization Options (Dropdown Popups)
                 AnimatedVisibility(visible = weekdayBar) {
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                         // Week Starting Day
                         Row(
@@ -1966,7 +2574,7 @@ fun HardwareSetupDeckCard(
                                 val wkndCol = if (weekdayWeekendColIdx == 0) actCol else (weekendColors.find { it.first == weekdayWeekendColIdx }?.second?.second ?: actCol)
 
                                 days.forEachIndexed { idx, day ->
-                                    val isToday = (idx == 2) // demo active Wednesday
+                                    val isToday = (idx == 2) // demo Wednesday
                                     val isWeekend = if (weekdayStartMon) (idx >= 5) else (idx == 0 || idx == 6)
                                     val barCol = when {
                                         isToday -> actCol
@@ -1987,66 +2595,103 @@ fun HardwareSetupDeckCard(
                             }
                         }
 
-                        // Active Day Color Palette
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("ACTIVE DAY PHOSPHOR COLOR:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                weekdayActiveColors.forEach { (idx, pair) ->
-                                    FilterChip(
-                                        selected = weekdayActiveColIdx == idx,
-                                        onClick = { weekdayActiveColIdx = idx },
-                                        leadingIcon = {
-                                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(pair.second))
-                                        },
-                                        label = { Text(pair.first, fontSize = 10.sp) }
-                                    )
-                                }
-                            }
-                        }
+                        // Compact Color Dropdown Pickers
+                        ColorDropdownPicker(
+                            label = "ACTIVE DAY PHOSPHOR COLOR",
+                            items = weekdayActiveColors,
+                            selectedIdx = weekdayActiveColIdx,
+                            onColorSelected = { weekdayActiveColIdx = it }
+                        )
 
-                        // Inactive Day Color Palette
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("INACTIVE DAY CONTRAST COLOR:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                weekdayInactiveColors.forEach { (idx, pair) ->
-                                    FilterChip(
-                                        selected = weekdayInactColIdx == idx,
-                                        onClick = { weekdayInactColIdx = idx },
-                                        leadingIcon = {
-                                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(pair.second))
-                                        },
-                                        label = { Text(pair.first, fontSize = 10.sp) }
-                                    )
-                                }
-                            }
-                        }
+                        ColorDropdownPicker(
+                            label = "INACTIVE DAY CONTRAST COLOR",
+                            items = weekdayInactiveColors,
+                            selectedIdx = weekdayInactColIdx,
+                            onColorSelected = { weekdayInactColIdx = it }
+                        )
 
-                        // Weekend Color Palette
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("WEEKEND PHOSPHOR COLOR:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                weekendColors.forEach { (idx, pair) ->
-                                    FilterChip(
-                                        selected = weekdayWeekendColIdx == idx,
-                                        onClick = { weekdayWeekendColIdx = idx },
-                                        leadingIcon = {
-                                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(pair.second))
-                                        },
-                                        label = { Text(pair.first, fontSize = 10.sp) }
-                                    )
-                                }
-                            }
+                        ColorDropdownPicker(
+                            label = "WEEKEND PHOSPHOR COLOR",
+                            items = weekendColors,
+                            selectedIdx = weekdayWeekendColIdx,
+                            onColorSelected = { weekdayWeekendColIdx = it }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. CAROUSEL & SCREEN SEQUENCE
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "2. CAROUSEL & SCREEN SEQUENCE",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto-Rotate Carousel", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Cycles enabled screens sequentially", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    }
+                    Switch(checked = autoRotate, onCheckedChange = { autoRotate = it })
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Screen Dwell Interval", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                        Text("${rotateSec.toInt()}s", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
+                    }
+                    Slider(value = rotateSec, onValueChange = { rotateSec = it }, valueRange = 3f..120f, steps = 117)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactDropdownSelector(
+                        label = "TRANSITION FX",
+                        items = transitionFxList,
+                        selectedValue = transitionFx,
+                        onValueChange = { transitionFx = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    CompactDropdownSelector(
+                        label = "DEFAULT SCREEN",
+                        items = screenNames,
+                        selectedValue = activeApp,
+                        onValueChange = { activeApp = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // 9 Screens in Rotation Sequence
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("ACTIVE SCREENS IN ROTATION (9 SCREENS):", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        screenNames.forEach { (appId, name) ->
+                            val isEnabled = (carouselMask and (1 shl appId)) != 0
+                            FilterChip(
+                                selected = isEnabled,
+                                onClick = {
+                                    val newMask = carouselMask xor (1 shl appId)
+                                    carouselMask = if (newMask == 0) 0x01 else newMask
+                                },
+                                leadingIcon = if (isEnabled) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) } } else null,
+                                label = { Text(name, fontSize = 11.sp) }
+                            )
                         }
                     }
                 }
             }
         }
 
-        // 2. AMBIENT PHOTOMETRY & NIGHT CYCLE
+        // 3. PHOTOMETRY & AMBIENT DISPLAY
         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "2. AMBIENT PHOTOMETRY & NIGHT CYCLE",
+                    text = "3. PHOTOMETRY & AMBIENT DISPLAY",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
@@ -2118,252 +2763,145 @@ fun HardwareSetupDeckCard(
                         }
                     }
                 }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                // Combined Battery and Screensaver Dropdowns
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactDropdownSelector(
+                        label = "BATTERY TELEMETRY",
+                        items = batteryModes,
+                        selectedValue = batMode,
+                        onValueChange = { batMode = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    CompactDropdownSelector(
+                        label = "SCREENSAVER STYLE",
+                        items = screensaverStyles,
+                        selectedValue = ssStyle,
+                        onValueChange = { ssStyle = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                CompactDropdownSelector(
+                    label = "SCREENSAVER INACTIVITY TIMEOUT",
+                    items = screensaverTimeouts,
+                    selectedValue = ssTime,
+                    onValueChange = { ssTime = it }
+                )
             }
         }
 
-        // 3. CAROUSEL ENGINE & SCREEN SEQUENCE
+        // 4. INTEGRATIONS & DATA FEEDS
         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    text = "3. CAROUSEL ENGINE & SCREEN ROTATION",
+                    text = "4. INTEGRATIONS & DATA FEEDS",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Auto-Rotate Carousel", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        Text("Cycles enabled screens sequentially", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                    }
-                    Switch(checked = autoRotate, onCheckedChange = { autoRotate = it })
-                }
+                // Weather Telemetry Section
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "METEOROLOGICAL TELEMETRY (OPEN-METEO)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                    )
 
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Screen Dwell Interval", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
-                        Text("${rotateSec.toInt()}s", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
-                    }
-                    Slider(value = rotateSec, onValueChange = { rotateSec = it }, valueRange = 3f..120f, steps = 117)
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("TRANSITION ANIMATION FX:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        transitionFxList.forEach { (fxId, label) ->
-                            FilterChip(
-                                selected = transitionFx == fxId,
-                                onClick = { transitionFx = fxId },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("DEFAULT ACTIVE SCREEN (WHEN PAUSED):", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        screenNames.forEach { (appId, name) ->
-                            FilterChip(
-                                selected = activeApp == appId,
-                                onClick = { activeApp = appId },
-                                label = { Text(name, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-
-                // 9 Screens in Rotation Sequence
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("ACTIVE SCREENS IN ROTATION SEQUENCE (9 SCREENS):", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        screenNames.forEach { (appId, name) ->
-                            val isEnabled = (carouselMask and (1 shl appId)) != 0
-                            FilterChip(
-                                selected = isEnabled,
-                                onClick = {
-                                    val newMask = carouselMask xor (1 shl appId)
-                                    carouselMask = if (newMask == 0) 0x01 else newMask
-                                },
-                                leadingIcon = if (isEnabled) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) } } else null,
-                                label = { Text(name, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. BATTERY TELEMETRY FORMAT
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "4. BATTERY TELEMETRY FORMAT",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-                )
-                Text(
-                    text = "Configure how battery metrics are formatted on screen 6",
-                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    batteryModes.forEach { (bMode, label) ->
-                        FilterChip(
-                            selected = batMode == bMode,
-                            onClick = { batMode = bMode },
-                            label = { Text(label, fontSize = 11.sp) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 5. RETRO AMBIENT SCREENSAVER
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "5. RETRO AMBIENT SCREENSAVER",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-                )
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("PROCEDURAL SCREENSAVER STYLE:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        screensaverStyles.forEach { (stId, label) ->
-                            FilterChip(
-                                selected = ssStyle == stId,
-                                onClick = { ssStyle = stId },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("INACTIVITY TIMEOUT:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        screensaverTimeouts.forEach { (toMin, label) ->
-                            FilterChip(
-                                selected = ssTime == toMin,
-                                onClick = { ssTime = toMin },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 6. METEOROLOGICAL TELEMETRY (OPEN-METEO)
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "6. METEOROLOGICAL TELEMETRY (OPEN-METEO)",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-                )
-
-                Text("PREDEFINED CITY PRESETS:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    cityPresets.forEach { (city, coords) ->
-                        FilterChip(
-                            selected = weatherCity.equals(city, ignoreCase = true),
-                            onClick = {
-                                weatherCity = city
+                    CompactDropdownSelector(
+                        label = "PRESET CITY",
+                        items = cityDropdownItems,
+                        selectedValue = weatherCity,
+                        onValueChange = { selectedCity ->
+                            weatherCity = selectedCity
+                            cityPresets.find { it.first == selectedCity }?.let { (_, coords) ->
                                 weatherLat = coords.first
                                 weatherLon = coords.second
-                            },
-                            label = { Text(city, fontSize = 11.sp) }
+                            }
+                        }
+                    )
+
+                    OutlinedTextField(
+                        value = weatherCity,
+                        onValueChange = { weatherCity = it },
+                        label = { Text("City Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = weatherLat.toString(),
+                            onValueChange = { v -> v.toFloatOrNull()?.let { weatherLat = it } },
+                            label = { Text("Latitude") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = weatherLon.toString(),
+                            onValueChange = { v -> v.toFloatOrNull()?.let { weatherLon = it } },
+                            label = { Text("Longitude") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
                         )
                     }
                 }
 
-                OutlinedTextField(
-                    value = weatherCity,
-                    onValueChange = { weatherCity = it },
-                    label = { Text("City Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = weatherLat.toString(),
-                        onValueChange = { v -> v.toFloatOrNull()?.let { weatherLat = it } },
-                        label = { Text("Latitude") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                // Crypto & Financial Markets Section
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "FINANCIAL MARKETS & CRYPTO TICKER",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                     )
+
+                    CompactDropdownSelector(
+                        label = "ASSET PRESET",
+                        items = assetDropdownItems,
+                        selectedValue = cryptoSymbol,
+                        onValueChange = { cryptoSymbol = it }
+                    )
+
                     OutlinedTextField(
-                        value = weatherLon.toString(),
-                        onValueChange = { v -> v.toFloatOrNull()?.let { weatherLon = it } },
-                        label = { Text("Longitude") },
-                        modifier = Modifier.weight(1f),
+                        value = cryptoSymbol,
+                        onValueChange = { cryptoSymbol = it },
+                        label = { Text("Custom Symbol / Ticker (e.g. BTC, ETH, TSLA, GOLD)") },
+                        modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                 }
-            }
-        }
 
-        // 7. FINANCIAL MARKETS & CRYPTO TICKER
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "7. FINANCIAL MARKETS & CRYPTO TICKER",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                Text("ASSET & COMMODITY PRESETS:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    assetPresets.forEach { sym ->
-                        FilterChip(
-                            selected = cryptoSymbol.equals(sym, ignoreCase = true),
-                            onClick = { cryptoSymbol = sym },
-                            label = { Text(sym, fontSize = 11.sp) }
-                        )
-                    }
+                // YouTube Telemetry Section
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "YOUTUBE CHANNEL TELEMETRY",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                    )
+
+                    OutlinedTextField(
+                        value = ytChannel,
+                        onValueChange = { ytChannel = it },
+                        label = { Text("YouTube Channel ID or @Handle") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = ytKey,
+                        onValueChange = { ytKey = it },
+                        label = { Text(if (status?.ytHasKey == true) "Google Cloud API Key (Stored ✓)" else "Google Cloud API Key") },
+                        placeholder = { Text(if (status?.ytHasKey == true) "•••••••• (Leave blank to keep unchanged)" else "Enter API key") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
                 }
 
-                OutlinedTextField(
-                    value = cryptoSymbol,
-                    onValueChange = { cryptoSymbol = it },
-                    label = { Text("Custom Symbol / Ticker (e.g. BTC, ETH, TSLA, GOLD, EUR)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-        }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-        // 8. YOUTUBE CHANNEL TELEMETRY
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "8. YOUTUBE CHANNEL TELEMETRY",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-                )
-
-                OutlinedTextField(
-                    value = ytChannel,
-                    onValueChange = { ytChannel = it },
-                    label = { Text("YouTube Channel ID or @Handle") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = ytKey,
-                    onValueChange = { ytKey = it },
-                    label = { Text(if (status?.ytHasKey == true) "Google Cloud API Key (Stored ✓)" else "Google Cloud API Key") },
-                    placeholder = { Text(if (status?.ytHasKey == true) "•••••••• (Leave blank to keep unchanged)" else "Enter API key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-        }
-
-        // 9. HOME ASSISTANT & MQTT TELEMETRY
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Home Assistant & MQTT Section
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2371,8 +2909,8 @@ fun HardwareSetupDeckCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "9. HOME ASSISTANT & MQTT",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                            text = "HOME ASSISTANT & MQTT",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                         )
                         Text(
                             text = if (status?.mqttConnected == true) "● MQTT BROKER CONNECTED" else "○ MQTT Client Offline",
@@ -2435,7 +2973,7 @@ fun HardwareSetupDeckCard(
             }
         }
 
-        // 10. MULTI-NETWORK WI-FI ROAMING MEMORY (4 SLOTS)
+        // 5. MULTI-NETWORK WI-FI ROAMING & SCANNER
         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
@@ -2445,7 +2983,7 @@ fun HardwareSetupDeckCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "10. WI-FI ROAMING MEMORY (4 SLOTS)",
+                            text = "5. WI-FI ROAMING MEMORY (4 SLOTS)",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
                         )
                         Text(

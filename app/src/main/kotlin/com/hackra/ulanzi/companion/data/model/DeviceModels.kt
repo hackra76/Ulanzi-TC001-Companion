@@ -149,3 +149,9 @@ data class WifiScanResult(
     @SerialName("rssi") val rssi: Int = 0,
     @SerialName("secure") val secure: Boolean = false
 )
+
+@Serializable
+data class CanvasPayload(
+    @SerialName("pixels") val pixels: List<List<String>>,
+    @SerialName("duration") val duration: Int = 60
+)

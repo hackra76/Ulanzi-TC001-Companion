@@ -95,9 +95,11 @@ class VirtualClockState:
         self.screensaver_timeout = 5
         self.screensaver_active = False
 
-        # Custom App
+        # Custom App & Canvas
         self.custom_apps = {}
         self.last_notification = None
+        self.custom_canvas_pixels = None
+        self.custom_canvas_until = 0
 
         # Wi-Fi Profiles
         self.wifi_profiles = [
@@ -188,6 +190,8 @@ class VirtualClockState:
 
     def generate_display_pixels(self):
         with self.lock:
+            if self.custom_canvas_pixels and time.time() < self.custom_canvas_until:
+                return self.custom_canvas_pixels
             # 8 rows x 32 columns
             pixels = [["#0B0B0A" for _ in range(32)] for _ in range(8)]
             app = self.active_app % 9
@@ -531,6 +535,35 @@ class UlanziSimulatorHandler(BaseHTTPRequestHandler):
             self.send_cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps({"status": "ok", "app": app_name}).encode("utf-8"))
+            return
+
+        elif path in ["/api/display", "/api/draw"]:
+            try:
+                data = json.loads(raw_body)
+            except Exception:
+                data = {}
+            with clock_state.lock:
+                dur = data.get("duration", 60)
+                if "pixels" in data and isinstance(data["pixels"], list):
+                    clock_state.custom_canvas_pixels = data["pixels"]
+                    clock_state.custom_canvas_until = time.time() + dur
+                    print(f"🎨 [CANVAS RECEIVED] Received 32x8 pixel drawing, displaying for {dur}s")
+                elif "draw" in data and isinstance(data["draw"], list):
+                    px = clock_state.custom_canvas_pixels or [["#0B0B0A" for _ in range(32)] for _ in range(8)]
+                    for cmd in data["draw"]:
+                        if "dp" in cmd and len(cmd["dp"]) >= 3:
+                            x, y, col = cmd["dp"][0], cmd["dp"][1], cmd["dp"][2]
+                            if 0 <= y < 8 and 0 <= x < 32:
+                                px[y][x] = str(col)
+                    clock_state.custom_canvas_pixels = px
+                    clock_state.custom_canvas_until = time.time() + dur
+                    print(f"🎨 [DRAW COMMANDS] Rendered commands on matrix, displaying for {dur}s")
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok","message":"Pixels rendered on matrix"}')
             return
 
         elif path == "/api/timer":
