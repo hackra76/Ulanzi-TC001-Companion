@@ -1,5 +1,6 @@
 package com.hackra.ulanzi.companion.ui.main
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hackra.ulanzi.companion.data.ConnectionState
@@ -9,6 +10,9 @@ import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
 import com.hackra.ulanzi.companion.data.model.NotifyPayload
+import com.hackra.ulanzi.companion.data.notification.ForwardedNotificationLog
+import com.hackra.ulanzi.companion.data.notification.NotificationSettings
+import com.hackra.ulanzi.companion.data.notification.NotificationSettingsManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,29 +24,59 @@ data class MainScreenUiState(
     val deviceStatus: DeviceStatus? = null,
     val displayMatrix: DisplayMatrixResponse? = null,
     val discoveryState: DiscoveryState = DiscoveryState.Idle,
+    val notificationSettings: NotificationSettings = NotificationSettings(),
+    val hasListenerPermission: Boolean = false,
+    val notificationLogs: List<ForwardedNotificationLog> = emptyList(),
     val actionMessage: String? = null
 )
 
 class MainScreenViewModel(
-    private val repository: UlanziRepository
+    private val repository: UlanziRepository,
+    private val notificationSettingsManager: NotificationSettingsManager
 ) : ViewModel() {
 
-    val uiState: StateFlow<MainScreenUiState> = combine(
+    private val repositoryFlow = combine(
         repository.connectionState,
         repository.deviceStatus,
         repository.displayMatrix,
         repository.discoveryState
     ) { conn, status, matrix, discovery ->
+        Tuple4(conn, status, matrix, discovery)
+    }
+
+    private val notificationFlow = combine(
+        notificationSettingsManager.settings,
+        notificationSettingsManager.hasListenerPermission,
+        notificationSettingsManager.logs
+    ) { settings, perm, logs ->
+        Tuple3(settings, perm, logs)
+    }
+
+    val uiState: StateFlow<MainScreenUiState> = combine(
+        repositoryFlow,
+        notificationFlow
+    ) { repo, notif ->
         MainScreenUiState(
-            connectionState = conn,
-            deviceStatus = status,
-            displayMatrix = matrix,
-            discoveryState = discovery
+            connectionState = repo.first,
+            deviceStatus = repo.second,
+            displayMatrix = repo.third,
+            discoveryState = repo.fourth,
+            notificationSettings = notif.first,
+            hasListenerPermission = notif.second,
+            notificationLogs = notif.third
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = MainScreenUiState()
+        initialValue = MainScreenUiState(
+            connectionState = repository.connectionState.value,
+            deviceStatus = repository.deviceStatus.value,
+            displayMatrix = repository.displayMatrix.value,
+            discoveryState = repository.discoveryState.value,
+            notificationSettings = notificationSettingsManager.settings.value,
+            hasListenerPermission = notificationSettingsManager.hasListenerPermission.value,
+            notificationLogs = notificationSettingsManager.logs.value
+        )
     )
 
     fun startDiscovery() {
@@ -97,4 +131,56 @@ class MainScreenViewModel(
             repository.refreshDisplayMatrix()
         }
     }
+
+    // Notification forwarding management methods
+    fun refreshNotificationPermission(): Boolean {
+        return notificationSettingsManager.refreshPermission()
+    }
+
+    fun getNotificationSettingsIntent(): Intent {
+        return notificationSettingsManager.getSettingsIntent()
+    }
+
+    fun setNotificationForwarding(enabled: Boolean) {
+        notificationSettingsManager.setForwardingEnabled(enabled)
+    }
+
+    fun setForwardCalls(enabled: Boolean) {
+        notificationSettingsManager.setForwardCalls(enabled)
+    }
+
+    fun setForwardMessaging(enabled: Boolean) {
+        notificationSettingsManager.setForwardMessaging(enabled)
+    }
+
+    fun setForwardCalendar(enabled: Boolean) {
+        notificationSettingsManager.setForwardCalendar(enabled)
+    }
+
+    fun setForwardOther(enabled: Boolean) {
+        notificationSettingsManager.setForwardOther(enabled)
+    }
+
+    fun setNotificationSound(sound: Int) {
+        notificationSettingsManager.setSound(sound)
+    }
+
+    fun setNotificationDuration(duration: Int) {
+        notificationSettingsManager.setDuration(duration)
+    }
+
+    fun setIgnoreOngoing(ignore: Boolean) {
+        notificationSettingsManager.setIgnoreOngoing(ignore)
+    }
+
+    fun setIncludeAppName(include: Boolean) {
+        notificationSettingsManager.setIncludeAppName(include)
+    }
+
+    fun clearNotificationLogs() {
+        notificationSettingsManager.clearLogs()
+    }
 }
+
+private data class Tuple4<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+private data class Tuple3<A, B, C>(val first: A, val second: B, val third: C)

@@ -12,7 +12,10 @@ import com.hackra.ulanzi.companion.data.model.ScreenSwitchResult
 import com.hackra.ulanzi.companion.data.model.ScreensaverResponse
 import com.hackra.ulanzi.companion.data.model.TimerResponse
 import com.hackra.ulanzi.companion.data.model.WifiResponse
+import com.hackra.ulanzi.companion.data.notification.NotificationSettings
+import com.hackra.ulanzi.companion.data.notification.NotificationSettingsManager
 import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,8 +26,29 @@ import org.junit.Test
 class MainScreenViewModelTest {
     @Test
     fun uiState_initiallyDisconnected() = runTest {
-        val viewModel = MainScreenViewModel(FakeUlanziRepository())
+        val notifManager = NotificationSettingsManager()
+        val viewModel = MainScreenViewModel(FakeUlanziRepository(), notifManager)
         assertEquals(ConnectionState.Disconnected, viewModel.uiState.first().connectionState)
+    }
+
+    @Test
+    fun notificationSettings_updatesProperly() = runTest {
+        val notifManager = NotificationSettingsManager(
+            initialSettings = NotificationSettings(isForwardingEnabled = false),
+            initialHasPermission = true
+        )
+        val viewModel = MainScreenViewModel(FakeUlanziRepository(), notifManager)
+        assertEquals(false, viewModel.uiState.value.notificationSettings.isForwardingEnabled)
+        assertTrue(viewModel.uiState.value.hasListenerPermission)
+
+        viewModel.setNotificationForwarding(true)
+        assertEquals(true, notifManager.settings.value.isForwardingEnabled)
+
+        viewModel.setNotificationSound(3)
+        assertEquals(3, notifManager.settings.value.sound)
+
+        viewModel.setNotificationDuration(12)
+        assertEquals(12, notifManager.settings.value.duration)
     }
 }
 

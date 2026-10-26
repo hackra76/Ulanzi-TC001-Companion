@@ -14,7 +14,11 @@ Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock
 
 - **🔍 Zero-Config Auto-Discovery**: Automatically discovers your Ulanzi TC001 clock on the local network via mDNS (`ulanzi-tc001.local`) or subnet scan.
 - **📺 Live Matrix Mirror**: Real-time 32×8 NeoPixel stream rendered directly in the app with BMP snapshot export (`/api/display/screenshot`).
-- **🔔 Notification Forwarder**: Seamlessly forwards incoming phone notifications (calls, messages, calendar, alarms) with selectable 8×8 pixel icons (`bell`, `mail`, `chat`, `warning`), acoustic buzzer chime, and custom duration.
+- **🔔 Android Notification Forwarding Engine (Phase 2)**:
+  - Background `NotificationListenerService` capturing incoming calls, messaging (WhatsApp, Telegram, Signal, SMS), calendar, and third-party alerts.
+  - Granular category filtering, suppression of ongoing/persistent notifications (music players, download bars), and 2.5-second duplicate debounce cache.
+  - Automatic 8×8 pixel icon mapping (`bell`, `mail`, `clock`, `spotify`, `warning`, `heart`), acoustic buzzer chime (0-3), and configurable display duration.
+  - In-app permission detection, quick system settings launcher, and live event stream ticker.
 - **🎵 Now Playing Media Sync**: Broadcasts real-time media player metadata (Spotify, YouTube Music, podcasts) with artist, title, smooth scrolling ticker, and bottom progress bar (`/api/custom`).
 - **🎛️ Remote Navigation & Controls**: Switch screens on the fly, toggle carousel auto-rotation, start/pause/reset stopwatch & countdown timers, and trigger ambient screensavers.
 - **📊 Live Telemetry & Quick Adjustments**: View real-time indoor temperature & humidity (Sensirion SHT30), battery level/voltage, Wi-Fi RSSI, and adjust day/night brightness.

@@ -19,4 +19,9 @@ class MainActivity : ComponentActivity() {
       UlanziTC001CompanionTheme { Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { MainNavigation() } }
     }
   }
+
+  override fun onResume() {
+    super.onResume()
+    UlanziCompanionApp.get().notificationSettingsManager.refreshPermission()
+  }
 }

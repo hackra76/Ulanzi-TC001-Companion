@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Ulanzi TC001 Companion</string>
+    <string name="notification_service_name">Ulanzi TC001 Notification Forwarder</string>
 </resources>
