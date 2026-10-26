@@ -39,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -46,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import com.hackra.ulanzi.companion.data.ConnectionState
+import com.hackra.ulanzi.companion.data.datastore.DevicePreferences
 import com.hackra.ulanzi.companion.data.discovery.DiscoveredDevice
 import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
@@ -83,7 +87,9 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var manualIpInput by remember { mutableStateOf("ulanzi-tc001.local") }
+    var manualIpInput by remember(uiState.devicePreferences.lastDeviceHost) {
+        mutableStateOf(uiState.devicePreferences.lastDeviceHost.ifBlank { "ulanzi-tc001.local" })
+    }
     var notificationText by remember { mutableStateOf("Hello from Android!") }
     var selectedIcon by remember { mutableStateOf("bell") }
 
@@ -135,7 +141,10 @@ fun MainScreen(
                     onConnectManual = { viewModel.connect(manualIpInput) },
                     onStartScan = { viewModel.startDiscovery() },
                     onStopScan = { viewModel.stopDiscovery() },
-                    onSelectDevice = { dev -> viewModel.connect(dev.ip) }
+                    onSelectDevice = { dev -> viewModel.connect(dev.ip) },
+                    autoReconnect = uiState.devicePreferences.autoReconnect,
+                    onAutoReconnectChange = { viewModel.setAutoReconnect(it) },
+                    lastSavedHost = uiState.devicePreferences.lastDeviceHost
                 )
             }
 
@@ -158,6 +167,18 @@ fun MainScreen(
                 ScreenSwitcherCard(
                     activeApp = status?.activeApp ?: 0,
                     onSwitch = { appIdx -> viewModel.switchScreen(appIdx) }
+                )
+
+                // 4. Remote Timer & Stopwatch (Phase 4)
+                TimerDeckCard(
+                    uiState = uiState,
+                    viewModel = viewModel
+                )
+
+                // 5. Ambient Screensaver & Hardware EEPROM Defaults (Phase 4 & 5)
+                ScreensaverAndDisplayDeckCard(
+                    uiState = uiState,
+                    viewModel = viewModel
                 )
 
                 // Push Notification Tester
@@ -245,7 +266,10 @@ fun DiscoveryControlCard(
     onConnectManual: () -> Unit,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
-    onSelectDevice: (DiscoveredDevice) -> Unit
+    onSelectDevice: (DiscoveredDevice) -> Unit,
+    autoReconnect: Boolean = true,
+    onAutoReconnectChange: (Boolean) -> Unit = {},
+    lastSavedHost: String = ""
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -290,6 +314,45 @@ fun DiscoveryControlCard(
                 ) {
                     Text("Connect")
                 }
+            }
+
+            if (lastSavedHost.isNotBlank() && manualIp != lastSavedHost) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Last device:",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = { onManualIpChange(lastSavedHost) },
+                        label = { Text(lastSavedHost, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Auto-Reconnect on Launch",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                    Text(
+                        "Automatically connects to last known device when app starts",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+                Switch(
+                    checked = autoReconnect,
+                    onCheckedChange = onAutoReconnectChange
+                )
             }
 
             Row(
@@ -1314,4 +1377,416 @@ fun MediaSyncDeckCard(
         }
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun TimerDeckCard(
+    uiState: MainScreenUiState,
+    viewModel: MainScreenViewModel
+) {
+    var mode by remember { mutableStateOf("countdown") }
+    var durationSec by remember(uiState.devicePreferences.timerDefaultDurationSec) {
+        mutableIntStateOf(uiState.devicePreferences.timerDefaultDurationSec)
+    }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "HARDWARE TIMER & STOPWATCH",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "Live countdown & stopwatch controller (/api/timer)",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+            }
+
+            // Mode Selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = mode == "countdown",
+                    onClick = { mode = "countdown" },
+                    label = { Text("⏳ Countdown Mode") },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = mode == "stopwatch",
+                    onClick = { mode = "stopwatch" },
+                    label = { Text("⏱ Stopwatch Mode") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Digital Readout Screen
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF101418))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .padding(vertical = 16.dp, horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val minutes = durationSec / 60
+                    val seconds = durationSec % 60
+                    val displayTime = if (mode == "countdown") {
+                        String.format(Locale.US, "%02d:%02d", minutes, seconds)
+                    } else {
+                        "00:00.0"
+                    }
+
+                    Text(
+                        text = displayTime,
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (mode == "countdown") Color(0xFF00E676) else Color(0xFF29B6F6)
+                        )
+                    )
+
+                    Text(
+                        text = if (mode == "countdown") "TARGET DURATION ($durationSec s)" else "ACTIVE STOPWATCH",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF9E9E9E)
+                        )
+                    )
+                }
+            }
+
+            // Countdown Quick Presets
+            if (mode == "countdown") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "QUICK PRESETS:",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                    val presets = listOf(
+                        60 to "1m",
+                        180 to "3m",
+                        300 to "5m",
+                        600 to "10m",
+                        900 to "15m",
+                        1500 to "25m (Pomodoro)"
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        presets.forEach { (sec, label) ->
+                            FilterChip(
+                                selected = durationSec == sec,
+                                onClick = {
+                                    durationSec = sec
+                                    viewModel.setTimerDefaultDuration(sec)
+                                },
+                                label = { Text(label, fontSize = 12.sp) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (mode == "countdown") {
+                            viewModel.startCountdown(durationSec)
+                        } else {
+                            viewModel.startStopwatch()
+                        }
+                    },
+                    modifier = Modifier.weight(1.2f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("▶ Start")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.pauseTimer() },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("⏸ Pause")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.resetTimer() },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("↺ Reset")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ScreensaverAndDisplayDeckCard(
+    uiState: MainScreenUiState,
+    viewModel: MainScreenViewModel
+) {
+    val prefs = uiState.devicePreferences
+    val status = uiState.deviceStatus
+
+    var selectedStyle by remember(prefs.screensaverStyle) { mutableIntStateOf(prefs.screensaverStyle) }
+    var selectedTimeout by remember(prefs.screensaverTimeoutMin) { mutableIntStateOf(prefs.screensaverTimeoutMin) }
+
+    var autoBri by remember(prefs.autoBrightness, status?.autoBri) {
+        mutableStateOf(status?.autoBri ?: prefs.autoBrightness)
+    }
+    var dayBri by remember(prefs.dayBrightness, status?.dayBri) {
+        mutableFloatStateOf((status?.dayBri ?: prefs.dayBrightness).toFloat())
+    }
+    var nightBri by remember(prefs.nightBrightness, status?.nightBri) {
+        mutableFloatStateOf((status?.nightBri ?: prefs.nightBrightness).toFloat())
+    }
+    var rotateSec by remember(prefs.carouselRotateSec, status?.rotateSec) {
+        mutableFloatStateOf((status?.rotateSec ?: prefs.carouselRotateSec).toFloat())
+    }
+    var saveSuccessMsg by remember { mutableStateOf<String?>(null) }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Column {
+                Text(
+                    text = "AMBIENT SCREENSAVER & HARDWARE DECK",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Text(
+                    text = "Screensaver presets (/api/screensaver) & EEPROM defaults (/save)",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+            }
+
+            // Screensaver Style
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "SCREENSAVER STYLE:",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                val styles = listOf(
+                    0 to "Matrix Rain 🟢",
+                    1 to "Starfield ✨",
+                    2 to "Fire Flames 🔥",
+                    3 to "Retro Clock ⏳",
+                    4 to "Plasma Flow 🌊"
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    styles.forEach { (styleId, label) ->
+                        FilterChip(
+                            selected = selectedStyle == styleId,
+                            onClick = {
+                                selectedStyle = styleId
+                                viewModel.setScreensaverDefaults(styleId, selectedTimeout)
+                            },
+                            label = { Text(label, fontSize = 12.sp) }
+                        )
+                    }
+                }
+            }
+
+            // Screensaver Timeout
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "IDLE ACTIVATION TIMEOUT:",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                val timeouts = listOf(1, 3, 5, 10, 15, 30)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    timeouts.forEach { min ->
+                        FilterChip(
+                            selected = selectedTimeout == min,
+                            onClick = {
+                                selectedTimeout = min
+                                viewModel.setScreensaverDefaults(selectedStyle, min)
+                            },
+                            label = { Text("${min}m", fontSize = 12.sp) }
+                        )
+                    }
+                }
+            }
+
+            // Screensaver Actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        viewModel.triggerScreensaver(selectedStyle, selectedTimeout)
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("▶ Start Screensaver")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.stopScreensaver() },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("⏹ Exit Screensaver")
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Hardware EEPROM Settings (Phase 5)
+            Text(
+                text = "HARDWARE DISPLAY & EEPROM DEFAULTS",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            )
+
+            // LDR Auto Brightness Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("LDR Ambient Auto-Brightness", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                    Text(
+                        "Automatically scale brightness via onboard light sensor",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+                Switch(
+                    checked = autoBri,
+                    onCheckedChange = { autoBri = it }
+                )
+            }
+
+            // Day Brightness Slider
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Daytime Brightness", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                    Text("${dayBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                }
+                Slider(
+                    value = dayBri,
+                    onValueChange = { dayBri = it },
+                    valueRange = 0f..100f,
+                    steps = 19
+                )
+            }
+
+            // Night Brightness Slider
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Nighttime Brightness", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                    Text("${nightBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                }
+                Slider(
+                    value = nightBri,
+                    onValueChange = { nightBri = it },
+                    valueRange = 0f..100f,
+                    steps = 19
+                )
+            }
+
+            // Carousel Auto-Rotate Slider
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Carousel Auto-Rotate Cycle", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                    Text("${rotateSec.toInt()}s", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                }
+                Slider(
+                    value = rotateSec,
+                    onValueChange = { rotateSec = it },
+                    valueRange = 3f..30f,
+                    steps = 26
+                )
+            }
+
+            // Save Button
+            Button(
+                onClick = {
+                    viewModel.saveHardwareSettings(
+                        dayBri = dayBri.toInt(),
+                        nightBri = nightBri.toInt(),
+                        autoBri = autoBri,
+                        rotateSec = rotateSec.toInt()
+                    )
+                    saveSuccessMsg = "Saved to Hardware EEPROM & DataStore Preferences!"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            ) {
+                Text("💾 Save to Hardware EEPROM & DataStore")
+            }
+
+            if (saveSuccessMsg != null) {
+                Text(
+                    text = "✓ $saveSuccessMsg",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color(0xFF00E676),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+        }
+    }
+}
+
 

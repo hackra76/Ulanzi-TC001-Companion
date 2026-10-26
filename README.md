@@ -25,8 +25,23 @@ Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock
   - Brand-specific adaptive pixel styling (Spotify Green `#1ED760`, YouTube Red, Cyan) with 8×8 Spotify icon and dynamic bottom progress bar.
   - Interactive tactile media transport deck in app (Play, Pause, Skip Next, Skip Previous, and Instant Push).
   - Configurable update intervals (3s Realtime, 5s Balanced, 10s Eco), marquee formatting options (`Title • Artist` vs `Artist - Title`), and optional auto-clean on pause (`DELETE /api/custom`).
-- **🎛️ Remote Navigation & Controls**: Switch screens on the fly, toggle carousel auto-rotation, start/pause/reset stopwatch & countdown timers, and trigger ambient screensavers.
-- **📊 Live Telemetry & Quick Adjustments**: View real-time indoor temperature & humidity (Sensirion SHT30), battery level/voltage, Wi-Fi RSSI, and adjust day/night brightness.
+- **⏱️ Remote Hardware Countdown Timer & Stopwatch (Phase 4)**:
+  - Direct hardware timer controller interfacing with `/api/timer` supporting both **Countdown** and **Stopwatch** modes.
+  - Digital readout simulation display with large monospace retro typography and live sync with clock telemetry.
+  - One-tap quick presets: 1m, 3m, 5m, 10m, 15m, and 25m Pomodoro cycles.
+  - Tactile transport controls for instant remote Start, Pause, and Reset.
+- **✨ Ambient Screensaver Engine (Phase 4)**:
+  - Full remote control of clock screensavers via `/api/screensaver` with instant Start and Exit triggers.
+  - 5 visual ambient presets: **Matrix Rain 🟢** (style 0), **Starfield ✨** (style 1), **Fire Flames 🔥** (style 2), **Retro Clock ⏳** (style 3), and **Plasma Flow 🌊** (style 4).
+  - Configurable idle activation timeout selector (1m, 3m, 5m, 10m, 15m, 30m) persisted directly to device preferences.
+- **💾 Jetpack DataStore Preferences & Auto-Reconnect Engine (Phase 5)**:
+  - Reactive `DataStore<Preferences>` persistence storing last connected host, auto-reconnect preferences, default timer duration, screensaver styles, and hardware brightness presets.
+  - Non-blocking background auto-reconnect engine on application startup with quick-connect chips for previous devices.
+- **🎛️ Hardware EEPROM Configuration Deck (Phase 5)**:
+  - Permanent clock configuration updates via `/save` committed directly to ESP32 EEPROM flash.
+  - LDR ambient auto-brightness toggle with automatic sensor-driven adaptation.
+  - Smooth slider controls for Daytime Brightness (0–100%), Nighttime Brightness (0–100%), and Carousel Auto-Rotate interval (3s–30s).
+- **📊 Live Telemetry & System Monitoring**: View real-time indoor temperature & humidity (Sensirion SHT30), battery level/voltage, Wi-Fi RSSI, and active application state.
 
 ---
 

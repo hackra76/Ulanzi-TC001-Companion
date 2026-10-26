@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.hackra.ulanzi.companion.data.ConnectionState
 import com.hackra.ulanzi.companion.data.UlanziRepository
 import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
+import com.hackra.ulanzi.companion.data.datastore.DevicePreferences
+import com.hackra.ulanzi.companion.data.datastore.DevicePreferencesManager
 import com.hackra.ulanzi.companion.data.media.MediaPlaybackState
 import com.hackra.ulanzi.companion.data.media.MediaSyncManager
 import com.hackra.ulanzi.companion.data.media.MediaSyncSettings
@@ -33,13 +35,15 @@ data class MainScreenUiState(
     val notificationLogs: List<ForwardedNotificationLog> = emptyList(),
     val mediaState: MediaPlaybackState = MediaPlaybackState(),
     val mediaSyncSettings: MediaSyncSettings = MediaSyncSettings(),
+    val devicePreferences: DevicePreferences = DevicePreferences(),
     val actionMessage: String? = null
 )
 
 class MainScreenViewModel(
     private val repository: UlanziRepository,
     private val notificationSettingsManager: NotificationSettingsManager,
-    private val mediaSyncManager: MediaSyncManager
+    private val mediaSyncManager: MediaSyncManager,
+    private val devicePreferencesManager: DevicePreferencesManager
 ) : ViewModel() {
 
     private val repositoryFlow = combine(
@@ -69,8 +73,9 @@ class MainScreenViewModel(
     val uiState: StateFlow<MainScreenUiState> = combine(
         repositoryFlow,
         notificationFlow,
-        mediaFlow
-    ) { repo, notif, media ->
+        mediaFlow,
+        devicePreferencesManager.preferences
+    ) { repo, notif, media, prefs ->
         MainScreenUiState(
             connectionState = repo.first,
             deviceStatus = repo.second,
@@ -80,7 +85,8 @@ class MainScreenViewModel(
             hasListenerPermission = notif.second,
             notificationLogs = notif.third,
             mediaState = media.first,
-            mediaSyncSettings = media.second
+            mediaSyncSettings = media.second,
+            devicePreferences = prefs
         )
     }.stateIn(
         scope = viewModelScope,
@@ -94,7 +100,8 @@ class MainScreenViewModel(
             hasListenerPermission = notificationSettingsManager.hasListenerPermission.value,
             notificationLogs = notificationSettingsManager.logs.value,
             mediaState = mediaSyncManager.mediaState.value,
-            mediaSyncSettings = mediaSyncManager.settings.value
+            mediaSyncSettings = mediaSyncManager.settings.value,
+            devicePreferences = devicePreferencesManager.preferences.value
         )
     )
 
@@ -239,6 +246,89 @@ class MainScreenViewModel(
 
     fun forceSyncMedia() {
         mediaSyncManager.triggerSyncToClock()
+    }
+
+    // Phase 4: Timer & Stopwatch Remote Controls
+    fun startCountdown(durationSec: Int) {
+        viewModelScope.launch {
+            repository.controlTimer(action = "start", mode = "countdown", duration = durationSec)
+        }
+    }
+
+    fun startStopwatch() {
+        viewModelScope.launch {
+            repository.controlTimer(action = "start", mode = "stopwatch")
+        }
+    }
+
+    fun pauseTimer() {
+        viewModelScope.launch {
+            repository.controlTimer(action = "pause")
+        }
+    }
+
+    fun resetTimer() {
+        viewModelScope.launch {
+            repository.controlTimer(action = "reset")
+        }
+    }
+
+    // Phase 4: Screensaver Controls
+    fun triggerScreensaver(style: Int, timeoutMin: Int) {
+        viewModelScope.launch {
+            repository.controlScreensaver(style = style, timeout = timeoutMin, action = "start")
+        }
+    }
+
+    fun stopScreensaver() {
+        viewModelScope.launch {
+            repository.controlScreensaver(action = "stop")
+        }
+    }
+
+    // Phase 5: Hardware Settings & DataStore Persistence
+    fun saveHardwareSettings(
+        dayBri: Int? = null,
+        nightBri: Int? = null,
+        autoBri: Boolean? = null,
+        rotateSec: Int? = null
+    ) {
+        viewModelScope.launch {
+            val params = mutableMapOf<String, String>()
+            dayBri?.let { params["day_bri"] = it.toString() }
+            nightBri?.let { params["night_bri"] = it.toString() }
+            autoBri?.let { params["auto_bri"] = if (it) "1" else "0" }
+            rotateSec?.let { params["rotate_sec"] = it.toString() }
+
+            if (params.isNotEmpty()) {
+                repository.saveSettings(params)
+                if (dayBri != null || nightBri != null || autoBri != null) {
+                    val current = uiState.value.devicePreferences
+                    devicePreferencesManager.setHardwareBrightnessDefaults(
+                        dayBri = dayBri ?: current.dayBrightness,
+                        nightBri = nightBri ?: current.nightBrightness,
+                        autoBri = autoBri ?: current.autoBrightness
+                    )
+                }
+                rotateSec?.let { devicePreferencesManager.setCarouselRotateSec(it) }
+            }
+        }
+    }
+
+    fun setAutoReconnect(enabled: Boolean) {
+        devicePreferencesManager.setAutoReconnect(enabled)
+    }
+
+    fun setLastDeviceHost(host: String) {
+        devicePreferencesManager.setLastDeviceHost(host)
+    }
+
+    fun setTimerDefaultDuration(durationSec: Int) {
+        devicePreferencesManager.setTimerDefaultDuration(durationSec)
+    }
+
+    fun setScreensaverDefaults(style: Int, timeoutMin: Int) {
+        devicePreferencesManager.setScreensaverDefaults(style, timeoutMin)
     }
 }
 

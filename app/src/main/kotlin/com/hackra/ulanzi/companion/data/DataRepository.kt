@@ -1,6 +1,7 @@
 package com.hackra.ulanzi.companion.data
 
 import android.content.Context
+import com.hackra.ulanzi.companion.data.datastore.DevicePreferencesManager
 import com.hackra.ulanzi.companion.data.discovery.DeviceDiscoveryManager
 import com.hackra.ulanzi.companion.data.discovery.DiscoveredDevice
 import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
@@ -56,7 +57,8 @@ interface UlanziRepository {
 
 class DefaultUlanziRepository(
     context: Context,
-    private val apiClient: UlanziApiClient = UlanziApiClient()
+    private val apiClient: UlanziApiClient = UlanziApiClient(),
+    private val preferencesManager: DevicePreferencesManager? = null
 ) : UlanziRepository {
 
     private val discoveryManager = DeviceDiscoveryManager(context.applicationContext, apiClient)
@@ -93,6 +95,9 @@ class DefaultUlanziRepository(
                 val device = DiscoveredDevice(ip = status.ip.ifBlank { hostOrIp }, hostname = hostOrIp, status = status)
                 _deviceStatus.value = status
                 _connectionState.value = ConnectionState.Connected(device)
+
+                // Persist last successful device IP/host
+                preferencesManager?.setLastDeviceHost(hostOrIp)
 
                 // Start background polling loop for status and live display stream
                 startPolling(scope)
@@ -156,11 +161,17 @@ class DefaultUlanziRepository(
     override suspend fun deleteCustomApp(name: String): Result<GenericStatusResponse> =
         apiClient.deleteCustomApp(name)
 
-    override suspend fun controlTimer(action: String, mode: String?, duration: Int?): Result<TimerResponse> =
-        apiClient.controlTimer(action, mode, duration)
+    override suspend fun controlTimer(action: String, mode: String?, duration: Int?): Result<TimerResponse> {
+        val res = apiClient.controlTimer(action, mode, duration)
+        res.onSuccess { refreshStatus() }
+        return res
+    }
 
-    override suspend fun controlScreensaver(style: Int?, timeout: Int?, action: String?): Result<ScreensaverResponse> =
-        apiClient.controlScreensaver(style, timeout, action)
+    override suspend fun controlScreensaver(style: Int?, timeout: Int?, action: String?): Result<ScreensaverResponse> {
+        val res = apiClient.controlScreensaver(style, timeout, action)
+        res.onSuccess { refreshStatus() }
+        return res
+    }
 
     override suspend fun getWifiStatus(): Result<WifiResponse> =
         apiClient.getWifiStatus()
