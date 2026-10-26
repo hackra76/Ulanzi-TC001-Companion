@@ -287,12 +287,18 @@ class MainScreenViewModel(
     fun rebootClock() {
         viewModelScope.launch {
             _isRebooting.value = true
-            _actionMessage.value = "Rebooting Ulanzi TC001 clock..."
-            repository.rebootDevice()
-            delay(4000)
-            _isRebooting.value = false
-            _actionMessage.value = "Clock reboot initiated. Re-probing connection..."
-            repository.refreshStatus()
+            _actionMessage.value = "Sending reboot command to clock..."
+            val result = repository.rebootDevice()
+            if (result.isSuccess) {
+                _actionMessage.value = "Clock reboot initiated. Re-probing connection..."
+                delay(3000)
+                _isRebooting.value = false
+                repository.refreshStatus()
+            } else {
+                _isRebooting.value = false
+                val err = result.exceptionOrNull()?.message ?: "Reboot failed"
+                _actionMessage.value = "Reboot failed: $err"
+            }
         }
     }
 
@@ -602,6 +608,8 @@ class MainScreenViewModel(
                     autoBri = effectiveAutoBri
                 )
                 devicePreferencesManager.setCarouselRotateSec(effectiveRotate)
+                delay(400)
+                repository.refreshStatus()
                 refreshWifi()
             } else {
                 _actionMessage.value = "Failed to save settings: ${res.exceptionOrNull()?.message}"

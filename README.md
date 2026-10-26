@@ -4,12 +4,22 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.2.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.2-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.3-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
 
 Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry decks, and full hardware integration, this companion app serves as a **complete, 100% standalone replacement for the ESP32 web portal**.
+
+---
+
+## 🌟 What's New in v1.0.3
+
+- **9-Screen Switcher Alignment**: Fixed screen index mismatch where clicking YouTube Analytics previously switched to Crypto. The screen list now matches the exact firmware `AppMode` order (`0: Clock`, `1: Indoor SHT30`, `2: Outdoor Weather`, `3: Crypto Ticker`, `4: YouTube Analytics`, `5: Live Airspace Radar`, `6: Battery Telemetry`, `7: Stopwatch & Timer`, `8: Ambient Screensaver`).
+- **Form State Stability During Telemetry Polling**: Fixed an issue where the 2-second background telemetry refresh caused user form changes (including the Weekday Indicators switch, sliders, and dropdowns) to revert before saving. Form inputs are now preserved cleanly with manual "🔄 Reload from Device" on demand.
+- **Save Feedback & State Refresh**: Enhanced "Save All Settings to Clock EEPROM & Flash" with immediate hardware status re-sync to ensure the UI strictly matches the committed flash state.
+- **Hardware Reboot Dialog & Endpoint Fallback**: Added a tactile confirmation dialog to prevent accidental restarts, backed by dual endpoint routing (`POST /api/reboot` with automatic `/reboot` fallback) and live reconnection handling.
+- **Virtual Clock Simulator**: Bundled a complete Python-based ESP32 REST API clock simulator (`virtual_clock_simulator.py` + `run-virtual-clock.bat`) for offline automated feature testing in Android emulators and host environments.
 
 ---
 

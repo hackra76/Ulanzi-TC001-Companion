@@ -241,16 +241,55 @@ class UlanziApiClient(
 
     suspend fun rebootDevice(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val request = Request.Builder()
+            // 1. Try POST /api/reboot (Standard REST API)
+            val req1 = Request.Builder()
+                .url("$baseUrl/api/reboot")
+                .post("".toRequestBody())
+                .build()
+
+            var lastCode = -1
+            try {
+                client.newCall(req1).execute().use { response ->
+                    lastCode = response.code
+                    if (response.isSuccessful || response.code == 200 || response.code == 302) {
+                        return@runCatching
+                    }
+                }
+            } catch (_: Exception) {}
+
+            // 2. Try POST /reboot (Legacy web server endpoint)
+            val req2 = Request.Builder()
                 .url("$baseUrl/reboot")
                 .post("".toRequestBody())
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful && response.code != 200 && response.code != 302) {
-                    throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+            try {
+                client.newCall(req2).execute().use { response ->
+                    lastCode = response.code
+                    if (response.isSuccessful || response.code == 200 || response.code == 302) {
+                        return@runCatching
+                    }
                 }
-            }
+            } catch (_: Exception) {}
+
+            // 3. Try GET /api/reboot (Some firmware variants use GET)
+            val req3 = Request.Builder()
+                .url("$baseUrl/api/reboot")
+                .get()
+                .build()
+
+            try {
+                client.newCall(req3).execute().use { response ->
+                    if (response.isSuccessful || response.code == 200 || response.code == 302) {
+                        return@runCatching
+                    }
+                }
+            } catch (_: Exception) {}
+
+            throw IllegalStateException(
+                if (lastCode == 404) "Reboot endpoint not found on device (HTTP 404). Check firmware support for /api/reboot."
+                else "HTTP $lastCode: Failed to trigger device reboot"
+            )
         }
     }
 

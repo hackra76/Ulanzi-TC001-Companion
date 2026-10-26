@@ -673,14 +673,14 @@ fun ScreenSwitcherCard(
 ) {
     val screens = listOf(
         0 to "🕐 Clock",
-        1 to "⛅ Weather",
-        2 to "🪙 Crypto",
-        3 to "▶ YouTube",
-        4 to "🔋 Battery",
-        5 to "🌡️ Ambient SHT30",
-        6 to "⏱️ Timer",
-        7 to "✨ Screensaver",
-        8 to "📶 Wi-Fi Roaming"
+        1 to "🌡️ Indoor SHT30",
+        2 to "⛅ Outdoor Weather",
+        3 to "🪙 Crypto & Stocks",
+        4 to "▶ YouTube Analytics",
+        5 to "✈️ Airspace Radar",
+        6 to "🔋 Battery & Power",
+        7 to "⏱️ Stopwatch & Timer",
+        8 to "✨ Ambient Screensaver"
     )
 
     ElevatedCard(
@@ -1667,43 +1667,49 @@ fun HardwareSetupDeckCard(
     var wifiSsidInput by remember { mutableStateOf("") }
     var wifiPassInput by remember { mutableStateOf("") }
 
-    // Re-sync all fields whenever status arrives from device or refreshes
-    LaunchedEffect(status) {
-        if (status != null) {
-            clkMode = status.clkMode
-            dateFormat = status.dateFormat
-            clockIcon = status.clockIcon
-            textAlign = status.textAlign
-            showSeconds = status.showSeconds
-            weekdayBar = status.weekdayBar
-            weekdayStartMon = status.weekdayStartMon
-            weekdayActiveColIdx = status.weekdayActiveColIdx
-            weekdayInactColIdx = status.weekdayInactColIdx
-            weekdayWeekendColIdx = status.weekdayWeekendColIdx
-            autoBri = status.autoBri
-            dayBri = status.dayBri.toFloat()
-            nightMode = status.nightMode
-            nightBri = status.nightBri.toFloat()
-            nightStart = status.nightStart
-            nightEnd = status.nightEnd
-            autoRotate = status.autoRotate
-            rotateSec = status.rotateSec.toFloat()
-            transitionFx = status.transitionFx
-            activeApp = status.activeApp
-            carouselMask = status.carouselMask
-            batMode = status.batMode
-            ssStyle = status.screensaverStyle ?: 0
-            ssTime = status.screensaverTimeout ?: 5
-            weatherCity = status.weatherCity ?: "Bratislava"
-            weatherLat = status.weatherLat ?: 48.1486f
-            weatherLon = status.weatherLon ?: 17.1077f
-            cryptoSymbol = status.cryptoSymbol ?: "BTC"
-            ytChannel = status.ytChannel ?: ""
-            mqttEn = status.mqttEn
-            mqttSrv = status.mqttSrv ?: ""
-            mqttPort = status.mqttPort
-            mqttUser = status.mqttUser ?: ""
-            mqttPre = status.mqttPre
+    var isInitializedForDevice by remember(status?.ip) { mutableStateOf(false) }
+    var forceReloadCounter by remember { mutableIntStateOf(0) }
+    var showRebootConfirmInDeck by remember { mutableStateOf(false) }
+
+    // Sync fields from device only on initial connection or when user explicitly reloads
+    LaunchedEffect(status?.ip, forceReloadCounter) {
+        val s = status
+        if (s != null && (!isInitializedForDevice || forceReloadCounter > 0)) {
+            clkMode = s.clkMode
+            dateFormat = s.dateFormat
+            clockIcon = s.clockIcon
+            textAlign = s.textAlign
+            showSeconds = s.showSeconds
+            weekdayBar = s.weekdayBar
+            weekdayStartMon = s.weekdayStartMon
+            weekdayActiveColIdx = s.weekdayActiveColIdx
+            weekdayInactColIdx = s.weekdayInactColIdx
+            weekdayWeekendColIdx = s.weekdayWeekendColIdx
+            autoBri = s.autoBri
+            dayBri = s.dayBri.toFloat()
+            nightMode = s.nightMode
+            nightBri = s.nightBri.toFloat()
+            nightStart = s.nightStart
+            nightEnd = s.nightEnd
+            autoRotate = s.autoRotate
+            rotateSec = s.rotateSec.toFloat()
+            transitionFx = s.transitionFx
+            activeApp = s.activeApp
+            carouselMask = s.carouselMask
+            batMode = s.batMode
+            ssStyle = s.screensaverStyle ?: 0
+            ssTime = s.screensaverTimeout ?: 5
+            weatherCity = s.weatherCity ?: "Bratislava"
+            weatherLat = s.weatherLat ?: 48.1486f
+            weatherLon = s.weatherLon ?: 17.1077f
+            cryptoSymbol = s.cryptoSymbol ?: "BTC"
+            ytChannel = s.ytChannel ?: ""
+            mqttEn = s.mqttEn
+            mqttSrv = s.mqttSrv ?: ""
+            mqttPort = s.mqttPort
+            mqttUser = s.mqttUser ?: ""
+            mqttPre = s.mqttPre
+            isInitializedForDevice = true
         }
     }
 
@@ -1753,9 +1759,32 @@ fun HardwareSetupDeckCard(
             mqttUser = mqttUser,
             mqttPass = mqttPass.ifBlank { null },
             mqttPre = mqttPre,
-            wifiSlot = selectedWifiSlot,
-            wifiSsid = wifiSsidInput.ifBlank { null },
+            wifiSlot = if (wifiPassInput.isNotBlank()) selectedWifiSlot else null,
+            wifiSsid = if (wifiPassInput.isNotBlank()) wifiSsidInput.ifBlank { null } else null,
             wifiPass = wifiPassInput.ifBlank { null }
+        )
+    }
+
+    if (showRebootConfirmInDeck) {
+        AlertDialog(
+            onDismissRequest = { showRebootConfirmInDeck = false },
+            title = { Text("Reboot Ulanzi TC001?") },
+            text = { Text("This will trigger a hardware restart of the clock via /api/reboot. The matrix will reconnect automatically after booting.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRebootConfirmInDeck = false
+                        viewModel.rebootClock()
+                    }
+                ) {
+                    Text("Reboot Now", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRebootConfirmInDeck = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 
@@ -1783,10 +1812,14 @@ fun HardwareSetupDeckCard(
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(onClick = { viewModel.refreshStatus(); viewModel.refreshWifi() }) {
+                        IconButton(onClick = {
+                            forceReloadCounter++
+                            viewModel.refreshStatus()
+                            viewModel.refreshWifi()
+                        }) {
                             Icon(Icons.Filled.Refresh, contentDescription = "Reload from Clock")
                         }
-                        IconButton(onClick = { viewModel.rebootClock() }) {
+                        IconButton(onClick = { showRebootConfirmInDeck = true }) {
                             Icon(Icons.Filled.RestartAlt, contentDescription = "Reboot Device", tint = MaterialTheme.colorScheme.error)
                         }
                     }
