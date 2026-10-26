@@ -5,9 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hackra.ulanzi.companion.data.ConnectionState
 import com.hackra.ulanzi.companion.data.UlanziRepository
-import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
 import com.hackra.ulanzi.companion.data.datastore.DevicePreferences
 import com.hackra.ulanzi.companion.data.datastore.DevicePreferencesManager
+import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
 import com.hackra.ulanzi.companion.data.media.MediaPlaybackState
 import com.hackra.ulanzi.companion.data.media.MediaSyncManager
 import com.hackra.ulanzi.companion.data.media.MediaSyncSettings
@@ -16,14 +16,25 @@ import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
 import com.hackra.ulanzi.companion.data.model.NotifyPayload
+import com.hackra.ulanzi.companion.data.model.WifiResponse
 import com.hackra.ulanzi.companion.data.notification.ForwardedNotificationLog
 import com.hackra.ulanzi.companion.data.notification.NotificationSettings
 import com.hackra.ulanzi.companion.data.notification.NotificationSettingsManager
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+enum class NavigationTab(val title: String, val iconName: String) {
+    DASHBOARD("Live Matrix", "dashboard"),
+    CONTROLS("Controls", "timer"),
+    MEDIA("Media Sync", "music"),
+    ALERTS("Push Alerts", "notifications"),
+    SETTINGS("Hardware Setup", "settings")
+}
 
 data class MainScreenUiState(
     val connectionState: ConnectionState = ConnectionState.Disconnected,
@@ -36,6 +47,9 @@ data class MainScreenUiState(
     val mediaState: MediaPlaybackState = MediaPlaybackState(),
     val mediaSyncSettings: MediaSyncSettings = MediaSyncSettings(),
     val devicePreferences: DevicePreferences = DevicePreferences(),
+    val selectedTab: NavigationTab = NavigationTab.DASHBOARD,
+    val wifiStatus: WifiResponse? = null,
+    val isRebooting: Boolean = false,
     val actionMessage: String? = null
 )
 
@@ -45,6 +59,11 @@ class MainScreenViewModel(
     private val mediaSyncManager: MediaSyncManager,
     private val devicePreferencesManager: DevicePreferencesManager
 ) : ViewModel() {
+
+    private val _selectedTab = MutableStateFlow(NavigationTab.DASHBOARD)
+    private val _wifiStatus = MutableStateFlow<WifiResponse?>(null)
+    private val _isRebooting = MutableStateFlow(false)
+    private val _actionMessage = MutableStateFlow<String?>(null)
 
     private val repositoryFlow = combine(
         repository.connectionState,
@@ -70,12 +89,22 @@ class MainScreenViewModel(
         media to settings
     }
 
+    private val extraFlow = combine(
+        devicePreferencesManager.preferences,
+        _selectedTab,
+        _wifiStatus,
+        _isRebooting,
+        _actionMessage
+    ) { prefs, tab, wifi, isReboot, msg ->
+        ExtraUiState(prefs, tab, wifi, isReboot, msg)
+    }
+
     val uiState: StateFlow<MainScreenUiState> = combine(
         repositoryFlow,
         notificationFlow,
         mediaFlow,
-        devicePreferencesManager.preferences
-    ) { repo, notif, media, prefs ->
+        extraFlow
+    ) { repo, notif, media, extra ->
         MainScreenUiState(
             connectionState = repo.first,
             deviceStatus = repo.second,
@@ -86,7 +115,11 @@ class MainScreenViewModel(
             notificationLogs = notif.third,
             mediaState = media.first,
             mediaSyncSettings = media.second,
-            devicePreferences = prefs
+            devicePreferences = extra.prefs,
+            selectedTab = extra.tab,
+            wifiStatus = extra.wifi,
+            isRebooting = extra.isRebooting,
+            actionMessage = extra.actionMessage
         )
     }.stateIn(
         scope = viewModelScope,
@@ -104,6 +137,14 @@ class MainScreenViewModel(
             devicePreferences = devicePreferencesManager.preferences.value
         )
     )
+
+    fun selectTab(tab: NavigationTab) {
+        _selectedTab.value = tab
+    }
+
+    fun clearActionMessage() {
+        _actionMessage.value = null
+    }
 
     fun startDiscovery() {
         repository.startDiscovery(viewModelScope)
@@ -127,9 +168,33 @@ class MainScreenViewModel(
         }
     }
 
+    fun toggleAutoRotate(enabled: Boolean) {
+        viewModelScope.launch {
+            val currentApp = uiState.value.deviceStatus?.activeApp ?: 0
+            repository.switchScreen(currentApp, enabled)
+        }
+    }
+
+    fun stepScreenNext() {
+        viewModelScope.launch {
+            val current = uiState.value.deviceStatus?.activeApp ?: 0
+            val next = (current + 1) % 9
+            repository.switchScreen(next)
+        }
+    }
+
+    fun stepScreenPrev() {
+        viewModelScope.launch {
+            val current = uiState.value.deviceStatus?.activeApp ?: 0
+            val prev = (current + 8) % 9
+            repository.switchScreen(prev)
+        }
+    }
+
     fun sendNotification(text: String, icon: String = "bell", sound: Int = 1, duration: Int = 5) {
         viewModelScope.launch {
             repository.sendNotification(NotifyPayload(text = text, icon = icon, sound = sound, duration = duration))
+            _actionMessage.value = "Notification sent to clock display!"
         }
     }
 
@@ -155,6 +220,38 @@ class MainScreenViewModel(
         viewModelScope.launch {
             repository.refreshStatus()
             repository.refreshDisplayMatrix()
+        }
+    }
+
+    fun refreshWifi() {
+        viewModelScope.launch {
+            repository.getWifiStatus().onSuccess {
+                _wifiStatus.value = it
+            }
+        }
+    }
+
+    fun connectWifiSlot(slot: Int) {
+        viewModelScope.launch {
+            _actionMessage.value = "Connecting clock to Wi-Fi slot $slot..."
+            repository.connectWifiSlot(slot).onSuccess {
+                _actionMessage.value = "Connected to Wi-Fi slot $slot!"
+                refreshWifi()
+            }.onFailure {
+                _actionMessage.value = "Failed to connect to Wi-Fi slot $slot: ${it.message}"
+            }
+        }
+    }
+
+    fun rebootClock() {
+        viewModelScope.launch {
+            _isRebooting.value = true
+            _actionMessage.value = "Rebooting Ulanzi TC001 clock..."
+            repository.rebootDevice()
+            delay(4000)
+            _isRebooting.value = false
+            _actionMessage.value = "Clock reboot initiated. Re-probing connection..."
+            repository.refreshStatus()
         }
     }
 
@@ -291,7 +388,21 @@ class MainScreenViewModel(
         dayBri: Int? = null,
         nightBri: Int? = null,
         autoBri: Boolean? = null,
-        rotateSec: Int? = null
+        rotateSec: Int? = null,
+        autoRotate: Boolean? = null,
+        carouselMask: Int? = null,
+        transitionFx: Int? = null,
+        city: String? = null,
+        weatherKey: String? = null,
+        cryptoSymbol: String? = null,
+        cryptoCurrency: String? = null,
+        ytChannel: String? = null,
+        timezone: String? = null,
+        timeFormat24h: Boolean? = null,
+        ntpServer: String? = null,
+        wifiSlot: Int? = null,
+        wifiSsid: String? = null,
+        wifiPass: String? = null
     ) {
         viewModelScope.launch {
             val params = mutableMapOf<String, String>()
@@ -299,9 +410,30 @@ class MainScreenViewModel(
             nightBri?.let { params["night_bri"] = it.toString() }
             autoBri?.let { params["auto_bri"] = if (it) "1" else "0" }
             rotateSec?.let { params["rotate_sec"] = it.toString() }
+            autoRotate?.let { params["auto_rotate"] = if (it) "1" else "0" }
+            carouselMask?.let { params["carousel_mask"] = it.toString() }
+            transitionFx?.let { params["transition_fx"] = it.toString() }
+            city?.let { if (it.isNotBlank()) params["city"] = it }
+            weatherKey?.let { if (it.isNotBlank()) params["weather_key"] = it }
+            cryptoSymbol?.let { if (it.isNotBlank()) params["crypto_symbol"] = it }
+            cryptoCurrency?.let { if (it.isNotBlank()) params["crypto_currency"] = it }
+            ytChannel?.let { if (it.isNotBlank()) params["yt_channel"] = it }
+            timezone?.let { if (it.isNotBlank()) params["timezone"] = it }
+            timeFormat24h?.let { params["time_format"] = if (it) "24" else "12" }
+            ntpServer?.let { if (it.isNotBlank()) params["ntp_server"] = it }
+            if (wifiSlot != null && !wifiSsid.isNullOrBlank()) {
+                params["slot"] = wifiSlot.toString()
+                params["ssid"] = wifiSsid
+                if (!wifiPass.isNullOrBlank()) params["pass"] = wifiPass
+            }
 
             if (params.isNotEmpty()) {
-                repository.saveSettings(params)
+                val res = repository.saveSettings(params)
+                if (res.isSuccess) {
+                    _actionMessage.value = "Hardware EEPROM settings saved to clock!"
+                } else {
+                    _actionMessage.value = "Failed to save settings: ${res.exceptionOrNull()?.message}"
+                }
                 if (dayBri != null || nightBri != null || autoBri != null) {
                     val current = uiState.value.devicePreferences
                     devicePreferencesManager.setHardwareBrightnessDefaults(
@@ -334,3 +466,10 @@ class MainScreenViewModel(
 
 private data class Tuple4<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 private data class Tuple3<A, B, C>(val first: A, val second: B, val third: C)
+private data class ExtraUiState(
+    val prefs: DevicePreferences,
+    val tab: NavigationTab,
+    val wifi: WifiResponse?,
+    val isRebooting: Boolean,
+    val actionMessage: String?
+)

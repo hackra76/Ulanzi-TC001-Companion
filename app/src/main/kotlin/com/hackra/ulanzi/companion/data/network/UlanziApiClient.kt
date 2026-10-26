@@ -237,6 +237,35 @@ class UlanziApiClient(
         }
     }
 
+    suspend fun rebootDevice(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("$baseUrl/reboot")
+                .post("".toRequestBody())
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful && response.code != 200 && response.code != 302) {
+                    throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                }
+            }
+        }
+    }
+
+    suspend fun connectWifiSlot(slot: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("$baseUrl/api/wifi?connect=$slot")
+                .header("Accept", "application/json")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+            }
+        }
+    }
+
     suspend fun probe(hostOrIp: String): DeviceStatus? = withContext(Dispatchers.IO) {
         try {
             val cleanHost = hostOrIp.removePrefix("http://").removePrefix("https://").trimEnd('/')

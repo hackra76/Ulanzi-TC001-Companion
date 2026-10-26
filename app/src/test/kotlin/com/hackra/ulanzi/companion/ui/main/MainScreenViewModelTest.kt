@@ -26,7 +26,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -177,6 +179,73 @@ class MainScreenViewModelTest {
         assertEquals(false, prefsManager.preferences.value.autoBrightness)
         assertEquals(12, prefsManager.preferences.value.carouselRotateSec)
     }
+
+    @Test
+    fun navigationTab_selectionUpdatesState() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        assertEquals(NavigationTab.DASHBOARD, viewModel.uiState.value.selectedTab)
+
+        viewModel.selectTab(NavigationTab.CONTROLS)
+        assertEquals(NavigationTab.CONTROLS, viewModel.uiState.value.selectedTab)
+
+        viewModel.selectTab(NavigationTab.SETTINGS)
+        assertEquals(NavigationTab.SETTINGS, viewModel.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun fullHardwareSettings_serializesAllParams() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        viewModel.saveHardwareSettings(
+            dayBri = 75,
+            nightBri = 5,
+            autoBri = true,
+            rotateSec = 10,
+            autoRotate = false,
+            carouselMask = 63,
+            transitionFx = 1,
+            city = "Prague,CZ",
+            cryptoSymbol = "SOL",
+            cryptoCurrency = "EUR",
+            timezone = "CET-1CEST",
+            timeFormat24h = true,
+            ntpServer = "time.cloudflare.com",
+            wifiSlot = 1,
+            wifiSsid = "Office-5G",
+            wifiPass = "secretpass"
+        )
+
+        val saved = repo.lastSavedSettings
+        assertEquals("75", saved?.get("day_bri"))
+        assertEquals("5", saved?.get("night_bri"))
+        assertEquals("1", saved?.get("auto_bri"))
+        assertEquals("10", saved?.get("rotate_sec"))
+        assertEquals("0", saved?.get("auto_rotate"))
+        assertEquals("63", saved?.get("carousel_mask"))
+        assertEquals("1", saved?.get("transition_fx"))
+        assertEquals("Prague,CZ", saved?.get("city"))
+        assertEquals("SOL", saved?.get("crypto_symbol"))
+        assertEquals("EUR", saved?.get("crypto_currency"))
+        assertEquals("CET-1CEST", saved?.get("timezone"))
+        assertEquals("24", saved?.get("time_format"))
+        assertEquals("time.cloudflare.com", saved?.get("ntp_server"))
+        assertEquals("1", saved?.get("slot"))
+        assertEquals("Office-5G", saved?.get("ssid"))
+        assertEquals("secretpass", saved?.get("pass"))
+    }
 }
 
 private class FakeUlanziRepository : UlanziRepository {
@@ -213,8 +282,10 @@ private class FakeUlanziRepository : UlanziRepository {
         return Result.success(ScreensaverResponse())
     }
     override suspend fun getWifiStatus(): Result<WifiResponse> = Result.success(WifiResponse())
+    override suspend fun connectWifiSlot(slot: Int): Result<Unit> = Result.success(Unit)
     override suspend fun saveSettings(params: Map<String, String>): Result<Unit> {
         lastSavedSettings = params
         return Result.success(Unit)
     }
+    override suspend fun rebootDevice(): Result<Unit> = Result.success(Unit)
 }

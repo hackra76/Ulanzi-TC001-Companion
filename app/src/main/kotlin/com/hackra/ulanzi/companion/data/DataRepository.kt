@@ -52,7 +52,9 @@ interface UlanziRepository {
     suspend fun controlTimer(action: String, mode: String? = null, duration: Int? = null): Result<TimerResponse>
     suspend fun controlScreensaver(style: Int? = null, timeout: Int? = null, action: String? = null): Result<ScreensaverResponse>
     suspend fun getWifiStatus(): Result<WifiResponse>
+    suspend fun connectWifiSlot(slot: Int): Result<Unit>
     suspend fun saveSettings(params: Map<String, String>): Result<Unit>
+    suspend fun rebootDevice(): Result<Unit>
 }
 
 class DefaultUlanziRepository(
@@ -176,9 +178,18 @@ class DefaultUlanziRepository(
     override suspend fun getWifiStatus(): Result<WifiResponse> =
         apiClient.getWifiStatus()
 
+    override suspend fun connectWifiSlot(slot: Int): Result<Unit> {
+        val res = apiClient.connectWifiSlot(slot)
+        res.onSuccess { refreshStatus() }
+        return res
+    }
+
     override suspend fun saveSettings(params: Map<String, String>): Result<Unit> {
         val res = apiClient.saveSettings(params)
         res.onSuccess { refreshStatus() }
         return res
     }
+
+    override suspend fun rebootDevice(): Result<Unit> =
+        apiClient.rebootDevice()
 }
