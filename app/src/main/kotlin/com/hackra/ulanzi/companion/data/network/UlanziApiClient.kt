@@ -106,13 +106,13 @@ class UlanziApiClient(
                         .post(bodyJson.toRequestBody(jsonMediaType))
                         .build()
                     client.newCall(fallbackReq).execute().use { fallbackResp ->
-                        if (!fallbackResp.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                        if (!fallbackResp.isSuccessful) throw IllegalStateException("HTTP ${fallbackResp.code}: ${fallbackResp.message}")
                         val body = fallbackResp.body?.string().orEmpty()
-                        json.decodeFromString<GenericStatusResponse>(body)
+                        if (body.isBlank()) GenericStatusResponse(status = "ok") else json.decodeFromString<GenericStatusResponse>(body)
                     }
                 } else {
                     val body = response.body?.string().orEmpty()
-                    json.decodeFromString<GenericStatusResponse>(body)
+                    if (body.isBlank()) GenericStatusResponse(status = "ok") else json.decodeFromString<GenericStatusResponse>(body)
                 }
             }
         }

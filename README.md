@@ -3,13 +3,24 @@
 [![Android](https://img.shields.io/badge/Platform-Android_8.0+_(API_26+)-brightgreen?logo=android)](https://www.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
-[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.2.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.4-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.4.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
+[![Release](https://img.shields.io/badge/Release-v1.0.5-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
 
 Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry decks, and full hardware integration, this companion app serves as a **complete, 100% standalone replacement for the ESP32 web portal**.
+
+---
+
+## 🌟 What's New in v1.0.5
+
+- **🎨 Direct Hardware Canvas Matrix Broadcast**:
+  - Full end-to-end integration with the newly released firmware v2.4.0 `POST /api/display` and `POST /api/draw` endpoints.
+  - Verified live broadcast: drawing on the 32×8 canvas in the Android app renders instantly onto the physical Ulanzi TC-001 NeoPixel matrix with audible chime confirmation and hardware button dismissal (`OK`, `LEFT`, `RIGHT`).
+- **🛡️ Robust Network Client & Error Handling**:
+  - Fixed fallback status code propagation in `UlanziApiClient` (`sendCanvasPixels`) ensuring precise HTTP error reporting.
+  - Added resilient empty/blank response body handling to guard against atypical HTTP 200/204 payloads.
 
 ---
 
