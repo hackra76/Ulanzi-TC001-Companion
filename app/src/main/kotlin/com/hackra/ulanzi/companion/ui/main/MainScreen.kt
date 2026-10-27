@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -190,33 +191,64 @@ fun MainScreen(
                     }
                 },
                 actions = {
+                    var showOverflowMenu by remember { mutableStateOf(false) }
+
                     if (uiState.firmwareUpdateState.hasUpdate) {
-                        FilterChip(
-                            selected = true,
-                            onClick = { viewModel.selectTab(NavigationTab.SETTINGS) },
-                            label = {
-                                Text(
-                                    text = "Update ${uiState.firmwareUpdateState.latestVersion ?: ""}",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { viewModel.selectTab(NavigationTab.SETTINGS) }) {
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                Icon(
+                                    Icons.Filled.SystemUpdate,
+                                    contentDescription = "Firmware Update Available",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFFF9100))
+                                )
                             }
-                        )
-                    }
-                    IconButton(onClick = { viewModel.setShowAboutDialog(true) }) {
-                        Icon(Icons.Filled.Info, contentDescription = "About App")
+                        }
                     }
                     if (uiState.connectionState is ConnectionState.Connected) {
                         IconButton(onClick = { viewModel.refreshStatus() }) {
                             Icon(Icons.Filled.Refresh, contentDescription = "Refresh Telemetry")
                         }
-                        IconButton(onClick = { showRebootConfirm = true }) {
-                            Icon(Icons.Filled.RestartAlt, contentDescription = "Reboot Clock", tint = MaterialTheme.colorScheme.error)
+                    }
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "More Options")
                         }
-                        IconButton(onClick = { viewModel.disconnect() }) {
-                            Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Disconnect")
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("About Companion") },
+                                leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.setShowAboutDialog(true)
+                                }
+                            )
+                            if (uiState.connectionState is ConnectionState.Connected) {
+                                DropdownMenuItem(
+                                    text = { Text("Reboot Clock", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Filled.RestartAlt, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp)) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        showRebootConfirm = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Disconnect") },
+                                    leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        viewModel.disconnect()
+                                    }
+                                )
+                            }
                         }
                     }
                 },
@@ -286,8 +318,10 @@ fun MainScreen(
                         ) {
                             Text(
                                 text = msg,
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.weight(1f)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             IconButton(
                                 onClick = { viewModel.clearActionMessage() },
                                 modifier = Modifier.size(24.dp)
@@ -573,7 +607,7 @@ fun LiveMatrixCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "LIVE 32×8 NEOPIXEL MATRIX STREAM",
                         style = MaterialTheme.typography.labelMedium.copy(
@@ -770,7 +804,10 @@ fun InteractivePixelCanvasCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Tools (Pen, Eraser, Bucket)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     FilterChip(
                         selected = uiState.canvasTool == CanvasTool.PEN,
                         onClick = { viewModel.setCanvasTool(CanvasTool.PEN) },
@@ -796,6 +833,8 @@ fun InteractivePixelCanvasCard(
                         }
                     )
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Display Active Color Preview
                 Row(
@@ -906,21 +945,24 @@ fun InteractivePixelCanvasCard(
             HorizontalDivider()
 
             // Display Duration selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Matrix Display Duration:",
-                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    text = "MATRIX DISPLAY DURATION:",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     listOf(15, 30, 60, 180).forEach { sec ->
                         FilterChip(
                             selected = uiState.canvasDisplayDurationSec == sec,
                             onClick = { viewModel.setCanvasDuration(sec) },
-                            label = { Text("${sec}s", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text("${sec}s", style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -1256,13 +1298,13 @@ fun TimerDeckCard(
                 FilterChip(
                     selected = mode == "countdown",
                     onClick = { mode = "countdown" },
-                    label = { Text("⏳ Countdown Mode") },
+                    label = { Text("⏳ Countdown", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     modifier = Modifier.weight(1f)
                 )
                 FilterChip(
                     selected = mode == "stopwatch",
                     onClick = { mode = "stopwatch" },
-                    label = { Text("⏱ Stopwatch Mode") },
+                    label = { Text("⏱ Stopwatch", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1551,6 +1593,7 @@ fun NotificationForwardingDeckCard(
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.weight(1f)
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
                                 val intent = viewModel.getNotificationSettingsIntent()
@@ -2582,7 +2625,12 @@ fun HardwareSetupDeckCard(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Week Starting Day:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                            Text(
+                                text = "Week Starting Day:",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 FilterChip(
                                     selected = weekdayStartMon,
@@ -2777,26 +2825,26 @@ fun HardwareSetupDeckCard(
                             Slider(value = nightBri, onValueChange = { nightBri = it }, valueRange = 1f..25f, steps = 24)
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Quiet Hours Schedule:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Quiet Hours Schedule (24h format):", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 OutlinedTextField(
                                     value = nightStart.toString(),
                                     onValueChange = { v -> v.toIntOrNull()?.let { nightStart = it.coerceIn(0, 23) } },
-                                    label = { Text("Start") },
-                                    modifier = Modifier.width(70.dp),
+                                    label = { Text("Start (0-23h)") },
+                                    modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
                                 Text("→", fontWeight = FontWeight.Bold)
                                 OutlinedTextField(
                                     value = nightEnd.toString(),
                                     onValueChange = { v -> v.toIntOrNull()?.let { nightEnd = it.coerceIn(0, 23) } },
-                                    label = { Text("End") },
-                                    modifier = Modifier.width(70.dp),
+                                    label = { Text("End (0-23h)") },
+                                    modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
                             }
@@ -3070,9 +3118,11 @@ fun HardwareSetupDeckCard(
                         ) {
                             Text(
                                 text = "PROFILE #$selectedWifiSlot CONFIGURATION",
+                                modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                             )
                             if (currentSlotProfile?.isCurrentlyActive == true) {
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "● ACTIVE RF LINK",
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E676))
@@ -3116,23 +3166,18 @@ fun HardwareSetupDeckCard(
                 }
 
                 // Wi-Fi RF Scanner Section
-                Row(
+                Button(
+                    onClick = { viewModel.scanWifiNetworks() },
+                    enabled = !uiState.isScanningWifi,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Button(
-                        onClick = { viewModel.scanWifiNetworks() },
-                        enabled = !uiState.isScanningWifi,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        if (uiState.isScanningWifi) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Scanning RF...", fontSize = 12.sp)
-                        } else {
-                            Text("📡 Scan Nearby Wi-Fi Networks", fontSize = 12.sp)
-                        }
+                    if (uiState.isScanningWifi) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Scanning RF...", fontSize = 12.sp)
+                    } else {
+                        Text("📡 Scan Nearby Wi-Fi Networks", fontSize = 12.sp)
                     }
                 }
 
@@ -3340,16 +3385,21 @@ fun DiscoveryControlCard(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Ulanzi TC001 (${dev.status.appName})",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "IP: ${dev.ip} • FW: v${dev.status.firmwareVersion} • RSSI: ${dev.status.rssi} dBm",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Button(onClick = { onSelectDevice(dev) }) {
                                 Text("Select")
                             }
@@ -3527,16 +3577,20 @@ fun FirmwareUpdateDeckCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(
+                                    modifier = Modifier.weight(1f),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                     Text(
                                         text = "Update Available: ${fwState.latestVersion}!",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 if (!fwState.releaseNotes.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     TextButton(
                                         onClick = { showReleaseNotesDialog = true }
                                     ) {
@@ -3578,8 +3632,12 @@ fun FirmwareUpdateDeckCard(
                         ) {
                             Text(
                                 text = fwState.updateStage ?: "Flashing firmware...",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "${fwState.progressPercent}%",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -3757,6 +3815,7 @@ fun FirmwareUpdateDeckCard(
                                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Button(
                                 onClick = { filePicker.launch("*/*") },
                                 enabled = !fwState.isUpdating,
@@ -3923,7 +3982,8 @@ fun AboutContactDeckCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Info,
