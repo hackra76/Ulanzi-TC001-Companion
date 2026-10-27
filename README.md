@@ -13,50 +13,6 @@ Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry
 
 ---
 
-## 🌟 What's New in v1.0.5
-
-- **🎨 Direct Hardware Canvas Matrix Broadcast**:
-  - Full end-to-end integration with the newly released firmware v2.4.0 `POST /api/display` and `POST /api/draw` endpoints.
-  - Verified live broadcast: drawing on the 32×8 canvas in the Android app renders instantly onto the physical Ulanzi TC-001 NeoPixel matrix with audible chime confirmation and hardware button dismissal (`OK`, `LEFT`, `RIGHT`).
-- **🛡️ Robust Network Client & Error Handling**:
-  - Fixed fallback status code propagation in `UlanziApiClient` (`sendCanvasPixels`) ensuring precise HTTP error reporting.
-  - Added resilient empty/blank response body handling to guard against atypical HTTP 200/204 payloads.
-
----
-
-## 🌟 What's New in v1.0.4
-
-- **🎨 Interactive 32×8 Pixel Canvas Studio**: Added an interactive drawing canvas directly in the Live Matrix tab:
-  - **Touch & Drag Drawing Engine**: Draw, tap, or stroke across the 32×8 Neopixel LED grid with instant live rendering.
-  - **Tactile Tool Suite**: Pen (✏️), Eraser (🧼), and Flood-Fill Bucket (🪣).
-  - **13-Color Neon & 8-Bit Palette**: Curated neon swatches (Hot Pink, Crimson, Amber, Volt Green, Cyan, Cobalt, Magenta, White, LED Off).
-  - **7 Retro Preset Stamps**: Instantly load retro art templates: ❤️ Love, 👻 Pac-Man & Blinky, 👾 Space Invaders, 📊 VU Equalizer, 🌈 Rainbow, 🔥 Flame, and 😎 Sunglasses Smiley.
-  - **Clone Clock Display**: 1-tap "Clone Clock" button that downloads the live hardware matrix into the Canvas Studio for instant editing.
-  - **Direct Hardware Broadcast**: 1-tap "Send to Clock Matrix" targeting `/api/display` with customizable display duration (15s, 30s, 60s, 180s).
-- **Streamlined, Uncluttered Settings Tab**: Completely reorganized the Settings tab from 10 sprawling cards into 5 clean, cohesive decks:
-  1. *Clock & Display Architecture*
-  2. *Carousel & Screen Sequence*
-  3. *Photometry & Ambient Display*
-  4. *Integrations & Data Feeds*
-  5. *Wi-Fi Roaming & Scanner*
-- **Compact Dropdown Popups for Colors & Selectors**: Replaced 32 loose color chips and dozens of mode chips with elegant, space-saving popup menus:
-  - `ColorDropdownPicker`: Features live circular color swatches, descriptive names, and checkmark indicators for Active Day, Inactive Day, and Weekend colors.
-  - `CompactDropdownSelector`: Streamlined 2-column dropdowns for Clock Modes, Date Notations, Clock Icons, Text Alignments, Transition FX, Default Screen, City Presets, Asset Tickers, Battery Telemetry, and Screensaver Styles/Timeouts.
-- **Dynamic Firmware Version in Top Bar**: The app header now dynamically displays the actual firmware version reported in device telemetry (`FW v<version> • <status>`) rather than a hardcoded string.
-- **Custom Hardware-Inspired App Icon**: Designed and integrated a bespoke adaptive Android app icon featuring the Ulanzi TC001's titanium enclosure, illuminated 8×32 matrix clock display with cyan/amber glow, and knurled buttons.
-
----
-
-## 🌟 What's New in v1.0.3
-
-- **9-Screen Switcher Alignment**: Fixed screen index mismatch where clicking YouTube Analytics previously switched to Crypto. The screen list now matches the exact firmware `AppMode` order (`0: Clock`, `1: Indoor SHT30`, `2: Outdoor Weather`, `3: Crypto Ticker`, `4: YouTube Analytics`, `5: Live Airspace Radar`, `6: Battery Telemetry`, `7: Stopwatch & Timer`, `8: Ambient Screensaver`).
-- **Form State Stability During Telemetry Polling**: Fixed an issue where the 2-second background telemetry refresh caused user form changes (including the Weekday Indicators switch, sliders, and dropdowns) to revert before saving. Form inputs are now preserved cleanly with manual "🔄 Reload from Device" on demand.
-- **Save Feedback & State Refresh**: Enhanced "Save All Settings to Clock EEPROM & Flash" with immediate hardware status re-sync to ensure the UI strictly matches the committed flash state.
-- **Hardware Reboot Dialog & Endpoint Fallback**: Added a tactile confirmation dialog to prevent accidental restarts, backed by dual endpoint routing (`POST /api/reboot` with automatic `/reboot` fallback) and live reconnection handling.
-- **Virtual Clock Simulator**: Bundled a complete Python-based ESP32 REST API clock simulator (`virtual_clock_simulator.py` + `run-virtual-clock.bat`) for offline automated feature testing in Android emulators and host environments.
-
----
-
 ## 📑 Feature Matrix & 100% Web Portal Parity
 
 | Feature | ESP32 Web Portal | Android Companion App | Notes |
