@@ -5,7 +5,9 @@ import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
 import com.hackra.ulanzi.companion.data.model.GenericStatusResponse
+import com.hackra.ulanzi.companion.data.model.GitHubRelease
 import com.hackra.ulanzi.companion.data.model.NotifyPayload
+import com.hackra.ulanzi.companion.data.model.OtaCheckResponse
 import com.hackra.ulanzi.companion.data.model.ScreenSwitchResult
 import com.hackra.ulanzi.companion.data.model.ScreensaverResponse
 import com.hackra.ulanzi.companion.data.model.TimerResponse
@@ -18,9 +20,11 @@ import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class UlanziApiClient(
@@ -53,6 +57,12 @@ class UlanziApiClient(
     private val probeClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(500, TimeUnit.MILLISECONDS)
         .readTimeout(800, TimeUnit.MILLISECONDS)
+        .build()
+
+    private val uploadClient: OkHttpClient = client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(180, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
         .build()
 
     suspend fun getStatus(): Result<DeviceStatus> = withContext(Dispatchers.IO) {
@@ -392,5 +402,124 @@ class UlanziApiClient(
         } catch (_: Exception) {
             null
         }
+    }
+
+    suspend fun checkOtaUpdate(currentFirmwareVersion: String = ""): Result<OtaCheckResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            // 1. First probe GitHub Releases API directly for rich release notes & binaries
+            try {
+                val ghRequest = Request.Builder()
+                    .url("https://api.github.com/repos/hackra76/Ulanzi-TC001-Evolved/releases/latest")
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .header("User-Agent", "Ulanzi-TC001-Companion")
+                    .get()
+                    .build()
+                client.newCall(ghRequest).execute().use { ghResp ->
+                    if (ghResp.isSuccessful) {
+                        val ghBody = ghResp.body?.string().orEmpty()
+                        val release = json.decodeFromString<GitHubRelease>(ghBody)
+                        val latestVer = release.tagName.removePrefix("v").trim()
+                        val currVer = currentFirmwareVersion.removePrefix("v").trim()
+                        val hasUpd = if (currVer.isNotBlank() && latestVer.isNotBlank()) {
+                            isVersionNewer(latestVer, currVer)
+                        } else false
+
+                        val binAsset = release.assets.find { it.name.endsWith(".bin") && !it.name.contains("factory") }
+                            ?: release.assets.firstOrNull { it.name.endsWith(".bin") }
+                        val dlUrl = binAsset?.browserDownloadUrl.orEmpty()
+
+                        return@withContext Result.success(
+                            OtaCheckResponse(
+                                currentVersion = currentFirmwareVersion,
+                                latestVersion = release.tagName,
+                                hasUpdate = hasUpd,
+                                downloadUrl = dlUrl,
+                                title = release.name.ifBlank { release.tagName },
+                                releaseNotes = release.body,
+                                publishedAt = release.publishedAt,
+                                htmlUrl = release.htmlUrl
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                // Fallback to clock on-board endpoint
+            }
+
+            // 2. Fallback to clock on-board REST endpoint
+            val request = Request.Builder()
+                .url("$baseUrl/api/ota/check")
+                .header("Accept", "application/json")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                val body = response.body?.string().orEmpty()
+                json.decodeFromString<OtaCheckResponse>(body)
+            }
+        }
+    }
+
+    suspend fun startCloudOta(downloadUrl: String): Result<GenericStatusResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = "$baseUrl/api/ota/install?url=${URLEncoder.encode(downloadUrl, "UTF-8")}"
+            val request = Request.Builder()
+                .url(url)
+                .post("".toRequestBody(jsonMediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                val body = response.body?.string().orEmpty()
+                if (body.isBlank()) GenericStatusResponse(status = "started", app = "OTA") else json.decodeFromString<GenericStatusResponse>(body)
+            }
+        }
+    }
+
+    suspend fun uploadFirmwareBinary(
+        bytes: ByteArray,
+        fileName: String,
+        onProgress: (Int) -> Unit
+    ): Result<GenericStatusResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            val rawBody = bytes.toRequestBody("application/octet-stream".toMediaType())
+            val countingBody = CountingRequestBody(rawBody) { written, total ->
+                val pct = if (total > 0) ((written * 100) / total).toInt() else 0
+                onProgress(pct.coerceIn(0, 100))
+            }
+            val multipart = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("update", fileName, countingBody)
+                .build()
+
+            val request = Request.Builder()
+                .url("$baseUrl/update")
+                .post(multipart)
+                .build()
+
+            uploadClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                val body = response.body?.string().orEmpty()
+                if (body.isBlank()) GenericStatusResponse(status = "success", app = "Flashed") else json.decodeFromString<GenericStatusResponse>(body)
+            }
+        }
+    }
+
+    private fun isVersionNewer(latest: String, current: String): Boolean {
+        try {
+            val latestParts = latest.split('.').map { it.toIntOrNull() ?: 0 }
+            val currentParts = current.split('.').map { it.toIntOrNull() ?: 0 }
+            val maxLen = maxOf(latestParts.size, currentParts.size)
+            for (i in 0 until maxLen) {
+                val l = latestParts.getOrElse(i) { 0 }
+                val c = currentParts.getOrElse(i) { 0 }
+                if (l > c) return true
+                if (l < c) return false
+            }
+        } catch (_: Exception) {
+            return latest != current
+        }
+        return false
     }
 }

@@ -389,4 +389,14 @@ private class FakeUlanziRepository : UlanziRepository {
         return Result.success(Unit)
     }
     override suspend fun rebootDevice(): Result<Unit> = Result.success(Unit)
+    override suspend fun checkOtaUpdate(currentVersion: String): Result<com.hackra.ulanzi.companion.data.model.OtaCheckResponse> =
+        Result.success(com.hackra.ulanzi.companion.data.model.OtaCheckResponse())
+    override suspend fun installCloudOta(downloadUrl: String): Result<GenericStatusResponse> =
+        Result.success(GenericStatusResponse())
+    override suspend fun uploadFirmwareBinary(
+        bytes: ByteArray,
+        fileName: String,
+        onProgress: (Int) -> Unit
+    ): Result<GenericStatusResponse> =
+        Result.success(GenericStatusResponse())
 }

@@ -1,6 +1,20 @@
 package com.hackra.ulanzi.companion.ui.main
 
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -176,6 +190,24 @@ fun MainScreen(
                     }
                 },
                 actions = {
+                    if (uiState.firmwareUpdateState.hasUpdate) {
+                        FilterChip(
+                            selected = true,
+                            onClick = { viewModel.selectTab(NavigationTab.SETTINGS) },
+                            label = {
+                                Text(
+                                    text = "Update ${uiState.firmwareUpdateState.latestVersion ?: ""}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                        )
+                    }
+                    IconButton(onClick = { viewModel.setShowAboutDialog(true) }) {
+                        Icon(Icons.Filled.Info, contentDescription = "About App")
+                    }
                     if (uiState.connectionState is ConnectionState.Connected) {
                         IconButton(onClick = { viewModel.refreshStatus() }) {
                             Icon(Icons.Filled.Refresh, contentDescription = "Refresh Telemetry")
@@ -349,6 +381,12 @@ fun MainScreen(
             }
         )
     }
+
+    if (uiState.showAboutDialog) {
+        AboutDialog(
+            onDismiss = { viewModel.setShowAboutDialog(false) }
+        )
+    }
 }
 
 // -------------------------------------------------------------
@@ -508,7 +546,9 @@ fun SettingsTabContent(
     uiState: MainScreenUiState,
     viewModel: MainScreenViewModel
 ) {
+    FirmwareUpdateDeckCard(uiState = uiState, viewModel = viewModel)
     HardwareSetupDeckCard(uiState = uiState, viewModel = viewModel)
+    AboutContactDeckCard(onOpenAboutDialog = { viewModel.setShowAboutDialog(true) })
 }
 
 // =============================================================
@@ -3319,4 +3359,785 @@ fun DiscoveryControlCard(
             }
         }
     }
+}
+
+
+// =============================================================
+// FIRMWARE UPDATE & ABOUT DECKS
+// =============================================================
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun FirmwareUpdateDeckCard(
+    uiState: MainScreenUiState,
+    viewModel: MainScreenViewModel
+) {
+    val fwState = uiState.firmwareUpdateState
+    val currentFw = uiState.deviceStatus?.firmwareVersion?.let { if (it.startsWith("v", ignoreCase = true)) it else "v$it" } ?: "v2.4.0"
+    val isConnected = uiState.connectionState is ConnectionState.Connected
+    val context = LocalContext.current
+
+    var selectedTabIdx by remember { mutableIntStateOf(0) } // 0 = Cloud OTA, 1 = Local .bin Flash
+    var customCloudUrl by remember(fwState.downloadUrl) { mutableStateOf(fwState.downloadUrl ?: "") }
+    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedFileName by remember { mutableStateOf<String?>(null) }
+    var selectedFileBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var showFlashConfirm by remember { mutableStateOf(false) }
+    var showCloudOtaConfirm by remember { mutableStateOf(false) }
+    var showReleaseNotesDialog by remember { mutableStateOf(false) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedFileUri = uri
+            var name = "firmware.bin"
+            try {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx != -1 && cursor.moveToFirst()) {
+                        name = cursor.getString(nameIdx) ?: "firmware.bin"
+                    }
+                }
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                selectedFileName = name
+                selectedFileBytes = bytes
+            } catch (e: Exception) {
+                // Ignore read error, handled during flash
+            }
+        }
+    }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SystemUpdate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "DEVICE FIRMWARE & OTA UPDATE",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    }
+                    Text(
+                        text = "Cloud OTA releases, GitHub check & local .bin flashing",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+                OutlinedButton(
+                    onClick = { viewModel.checkForFirmwareUpdate() },
+                    enabled = !fwState.isChecking && !fwState.isUpdating,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    if (fwState.isChecking) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (fwState.isChecking) "Checking..." else "Check GitHub")
+                }
+            }
+
+            // Version comparison overview card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "CLOCK FIRMWARE",
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                            Text(
+                                text = if (isConnected) currentFw else "Clock Offline",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = if (isConnected) Color(0xFF00E676) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "LATEST GITHUB RELEASE",
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                            Text(
+                                text = fwState.latestVersion ?: "Not Checked",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = if (fwState.hasUpdate) Color(0xFFFF9100) else MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+                    }
+
+                    if (fwState.hasUpdate) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "Update Available: ${fwState.latestVersion}!",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                                if (!fwState.releaseNotes.isNullOrBlank()) {
+                                    TextButton(
+                                        onClick = { showReleaseNotesDialog = true }
+                                    ) {
+                                        Text("Release Notes", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        }
+                    } else if (fwState.latestVersion != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color(0xFF00E676), modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "Device is up to date with the latest official release.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // In-Progress / Error / Success Banners
+            AnimatedVisibility(visible = fwState.isUpdating) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = fwState.updateStage ?: "Flashing firmware...",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "${fwState.progressPercent}%",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { fwState.progressPercent / 100f },
+                            modifier = Modifier.fillMaxWidth().height(6.dp)
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "DO NOT unplug or turn off clock power during firmware flashing!",
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                            )
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = fwState.isSuccess) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B5E20).copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color(0xFF00E676), modifier = Modifier.size(20.dp))
+                            Text(
+                                text = fwState.updateStage ?: "Firmware updated successfully! Clock is rebooting...",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                        IconButton(onClick = { viewModel.dismissFirmwareStatus() }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = fwState.errorMessage != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = fwState.errorMessage ?: "Update failed",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                            )
+                        }
+                        IconButton(onClick = { viewModel.dismissFirmwareStatus() }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
+            // Method Selector: Cloud OTA vs Local Flash
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = selectedTabIdx == 0,
+                    onClick = { selectedTabIdx = 0 },
+                    label = { Text("Cloud OTA (1-Click)") },
+                    leadingIcon = { Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = selectedTabIdx == 1,
+                    onClick = { selectedTabIdx = 1 },
+                    label = { Text("Local File (.bin)") },
+                    leadingIcon = { Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (selectedTabIdx == 0) {
+                // Cloud OTA Section
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Cloud OTA instructs the Ulanzi TC001 to download the compiled binary directly over Wi-Fi from GitHub Releases and flash it into the OTA partition.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                    OutlinedTextField(
+                        value = customCloudUrl,
+                        onValueChange = { customCloudUrl = it },
+                        label = { Text("Firmware Binary URL (.bin)") },
+                        placeholder = { Text("https://github.com/.../firmware.bin") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        trailingIcon = {
+                            if (fwState.downloadUrl != null) {
+                                IconButton(onClick = { customCloudUrl = fwState.downloadUrl ?: "" }) {
+                                    Icon(Icons.Filled.Download, contentDescription = "Fill Latest GitHub URL")
+                                }
+                            }
+                        }
+                    )
+                    Button(
+                        onClick = { showCloudOtaConfirm = true },
+                        enabled = isConnected && customCloudUrl.isNotBlank() && !fwState.isUpdating,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Start Cloud OTA Update")
+                    }
+                    if (!isConnected) {
+                        Text(
+                            text = "⚠️ Clock must be connected to companion app to trigger OTA.",
+                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        )
+                    }
+                }
+            } else {
+                // Local File .bin Flashing Section
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Upload a pre-compiled firmware.bin from your Android downloads/storage directly over HTTP (/update endpoint) to the clock's ESP32 flash partition.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = selectedFileName ?: "No file chosen",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = if (selectedFileName != null) FontFamily.Monospace else FontFamily.Default
+                                    )
+                                )
+                                val sizeText = selectedFileBytes?.let { "${it.size / 1024} KB (${String.format(Locale.US, "%.2f", it.size / 1048576f)} MB)" } ?: "Supported: compiled .bin binaries"
+                                Text(
+                                    text = sizeText,
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                )
+                            }
+                            Button(
+                                onClick = { filePicker.launch("*/*") },
+                                enabled = !fwState.isUpdating,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Choose File")
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = { showFlashConfirm = true },
+                        enabled = isConnected && selectedFileBytes != null && !fwState.isUpdating,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Flash Firmware Binary to Clock")
+                    }
+                    if (!isConnected) {
+                        Text(
+                            text = "⚠️ Connect clock first to enable local flashing.",
+                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Confirmation Dialog: Cloud OTA
+    if (showCloudOtaConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCloudOtaConfirm = false },
+            title = { Text("Confirm Cloud OTA Update") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("The clock will directly stream and install the firmware binary from:")
+                    Text(
+                        text = customCloudUrl,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.primary)
+                    )
+                    Text("The matrix will reboot automatically upon successful flash. Do not disconnect power.")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCloudOtaConfirm = false
+                        viewModel.installCloudOta(customCloudUrl)
+                    }
+                ) {
+                    Text("Proceed with OTA")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloudOtaConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Confirmation Dialog: Local File Flash
+    if (showFlashConfirm) {
+        AlertDialog(
+            onDismissRequest = { showFlashConfirm = false },
+            title = { Text("Confirm Local Firmware Flash") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("You are about to flash:")
+                    Text(
+                        text = "${selectedFileName} (${(selectedFileBytes?.size ?: 0) / 1024} KB)",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    )
+                    Text(
+                        text = "⚠️ CRITICAL: Ensure the Ulanzi TC-001 has steady USB-C power. Interrupting the flash may require USB flashing via esptool.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.error)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showFlashConfirm = false
+                        selectedFileBytes?.let { bytes ->
+                            viewModel.uploadLocalFirmware(bytes, selectedFileName ?: "firmware.bin")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Flash Now")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFlashConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Release Notes Dialog
+    if (showReleaseNotesDialog && !fwState.releaseNotes.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = { showReleaseNotesDialog = false },
+            title = {
+                Text("${fwState.releaseTitle ?: fwState.latestVersion ?: "Release Notes"}")
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    fwState.publishedAt?.take(10)?.let { pubDate ->
+                        Text("Published: $pubDate", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = fwState.releaseNotes ?: "",
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showReleaseNotesDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun AboutContactDeckCard(
+    onOpenAboutDialog: () -> Unit
+) {
+    val context = LocalContext.current
+    fun openBrowser(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        } catch (_: Exception) {}
+    }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "ABOUT & DEVELOPER",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+                TextButton(onClick = onOpenAboutDialog) {
+                    Text("Full Details")
+                }
+            }
+
+            Text(
+                text = "Ulanzi TC001 Companion v1.0.6 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
+                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { openBrowser("https://github.com/hackra76/Ulanzi-TC001-Companion") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Companion Repo", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Button(
+                    onClick = { openBrowser("https://buymeacoffee.com/hackra76") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF813F)),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Buy Me a Coffee", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AboutDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    fun openBrowser(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        } catch (_: Exception) {}
+    }
+
+    val appVersion = remember {
+        try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName ?: "1.0.6"
+        } catch (_: Exception) {
+            "1.0.6"
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Dashboard, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Column {
+                    Text(
+                        text = "Ulanzi TC001 Companion",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = "Version $appVersion (Release Build)",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "A complete, modern Android companion app for the Ulanzi TC-001 Smart Pixel Clock running custom ESP32 firmware (Ulanzi-TC001-Evolved).",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                HorizontalDivider()
+
+                Text(
+                    text = "KEY CAPABILITIES",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("• 32×8 Neopixel live stream & Canvas Studio pixel drawing", style = MaterialTheme.typography.bodySmall)
+                    Text("• Multi-profile Wi-Fi management with local subnet discovery", style = MaterialTheme.typography.bodySmall)
+                    Text("• Live media metadata sync (Spotify, YouTube, Music apps)", style = MaterialTheme.typography.bodySmall)
+                    Text("• Android notification forwarding with custom sounds & icons", style = MaterialTheme.typography.bodySmall)
+                    Text("• Ambient photometry, night mode & carousel controls", style = MaterialTheme.typography.bodySmall)
+                    Text("• 1-Click cloud OTA updates & local .bin firmware flashing", style = MaterialTheme.typography.bodySmall)
+                }
+
+                HorizontalDivider()
+
+                Text(
+                    text = "DEVELOPER & CREDITS",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                )
+                Text(
+                    text = "Created by Radovan Dvorský (@hackra76)\nOpen-source hardware enthusiast & developer.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                HorizontalDivider()
+
+                Text(
+                    text = "LINKS & RESOURCES",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                )
+
+                OutlinedButton(
+                    onClick = { openBrowser("https://github.com/hackra76/Ulanzi-TC001-Companion") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Companion App GitHub Repository")
+                }
+
+                OutlinedButton(
+                    onClick = { openBrowser("https://github.com/hackra76/Ulanzi-TC001-Evolved") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Firmware Evolved GitHub Repository")
+                }
+
+                OutlinedButton(
+                    onClick = { openBrowser("https://github.com/hackra76/Ulanzi-TC001-Companion/issues") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Report Bug / Request Feature")
+                }
+
+                OutlinedButton(
+                    onClick = { openBrowser("https://github.com/hackra76/Ulanzi-TC001-Companion/releases") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Releases & Changelogs")
+                }
+
+                Button(
+                    onClick = { openBrowser("https://buymeacoffee.com/hackra76") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF813F)),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Support on Buy Me a Coffee", color = Color.White)
+                }
+
+                HorizontalDivider()
+
+                Text(
+                    text = "LEGAL & DISCLAIMER",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                )
+                Text(
+                    text = "Released under the MIT License.\nUlanzi is a registered trademark of Shenzhen Ulanzi Technology Co., Ltd. This companion project is an independent open-source tool and is not officially affiliated with or endorsed by Ulanzi.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }

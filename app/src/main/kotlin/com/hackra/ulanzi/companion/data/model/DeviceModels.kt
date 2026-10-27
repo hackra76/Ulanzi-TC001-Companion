@@ -155,3 +155,33 @@ data class CanvasPayload(
     @SerialName("pixels") val pixels: List<List<String>>,
     @SerialName("duration") val duration: Int = 60
 )
+
+@Serializable
+data class OtaCheckResponse(
+    @SerialName("current_version") val currentVersion: String = "",
+    @SerialName("latest_version") val latestVersion: String = "",
+    @SerialName("has_update") val hasUpdate: Boolean = false,
+    @SerialName("download_url") val downloadUrl: String = "",
+    @SerialName("title") val title: String? = null,
+    @SerialName("release_notes") val releaseNotes: String? = null,
+    @SerialName("published_at") val publishedAt: String? = null,
+    @SerialName("html_url") val htmlUrl: String? = null
+)
+
+@Serializable
+data class GitHubReleaseAsset(
+    @SerialName("name") val name: String = "",
+    @SerialName("browser_download_url") val browserDownloadUrl: String = "",
+    @SerialName("size") val size: Long = 0L
+)
+
+@Serializable
+data class GitHubRelease(
+    @SerialName("tag_name") val tagName: String = "",
+    @SerialName("name") val name: String = "",
+    @SerialName("body") val body: String = "",
+    @SerialName("published_at") val publishedAt: String = "",
+    @SerialName("html_url") val htmlUrl: String = "",
+    @SerialName("assets") val assets: List<GitHubReleaseAsset> = emptyList()
+)
+

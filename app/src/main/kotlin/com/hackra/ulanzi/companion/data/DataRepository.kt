@@ -10,6 +10,7 @@ import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
 import com.hackra.ulanzi.companion.data.model.GenericStatusResponse
 import com.hackra.ulanzi.companion.data.model.NotifyPayload
+import com.hackra.ulanzi.companion.data.model.OtaCheckResponse
 import com.hackra.ulanzi.companion.data.model.ScreenSwitchResult
 import com.hackra.ulanzi.companion.data.model.ScreensaverResponse
 import com.hackra.ulanzi.companion.data.model.TimerResponse
@@ -59,6 +60,9 @@ interface UlanziRepository {
     suspend fun deleteWifiSlot(slot: Int): Result<Unit>
     suspend fun saveSettings(params: Map<String, String>): Result<Unit>
     suspend fun rebootDevice(): Result<Unit>
+    suspend fun checkOtaUpdate(currentVersion: String = ""): Result<OtaCheckResponse>
+    suspend fun installCloudOta(downloadUrl: String): Result<GenericStatusResponse>
+    suspend fun uploadFirmwareBinary(bytes: ByteArray, fileName: String, onProgress: (Int) -> Unit): Result<GenericStatusResponse>
 }
 
 class DefaultUlanziRepository(
@@ -211,4 +215,17 @@ class DefaultUlanziRepository(
 
     override suspend fun rebootDevice(): Result<Unit> =
         apiClient.rebootDevice()
+
+    override suspend fun checkOtaUpdate(currentVersion: String): Result<OtaCheckResponse> =
+        apiClient.checkOtaUpdate(currentVersion)
+
+    override suspend fun installCloudOta(downloadUrl: String): Result<GenericStatusResponse> =
+        apiClient.startCloudOta(downloadUrl)
+
+    override suspend fun uploadFirmwareBinary(
+        bytes: ByteArray,
+        fileName: String,
+        onProgress: (Int) -> Unit
+    ): Result<GenericStatusResponse> =
+        apiClient.uploadFirmwareBinary(bytes, fileName, onProgress)
 }

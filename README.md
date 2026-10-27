@@ -4,7 +4,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.4.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.5-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.6-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
@@ -36,6 +36,8 @@ Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry
 | **YouTube Channel Telemetry** | ✅ | ✅ | Channel @handle / ID & Google Cloud API key |
 | **Home Assistant & MQTT** | ✅ | ✅ | Auto-discovery switch, broker IP/port, auth, topic prefix, live status |
 | **Remote Hardware Reboot** | ✅ | ✅ | Instant `/reboot` trigger with automated reconnect handshake |
+| **Firmware Update & OTA Engine** | ✅ | ✅ | GitHub release checker, 1-click cloud OTA (`/api/ota/install`), and local `.bin` flash (`/update`) with live percentage progress |
+| **About & Developer Hub** | ❌ | ✅ **Exclusive** | App version info, release notes viewer, Buy Me a Coffee support, GitHub repos, and issue tracker |
 | **Interactive Pixel Canvas Studio** | ❌ | ✅ **Exclusive** | 32×8 touch/drag drawing engine, 13-color neon palette, pen/eraser/bucket, 7 retro presets, clock cloner & hardware push |
 | **Android Push Notifications** | ❌ | ✅ **Exclusive** | Background `NotificationListenerService` forwarding calls, SMS, WhatsApp, etc. |
 | **Spotify / Media Broadcaster** | ❌ | ✅ **Exclusive** | Live track title, artist, progress bar streaming via `/api/custom` |
@@ -154,6 +156,17 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
   - Active RF link badges and stored password indicators.
   - 1-tap connect, 1-tap clear, and onboard Wi-Fi RF scanner detecting nearby SSIDs.
 - **Device Operations**: One-tap commit to EEPROM flash, remote hardware reboot, and "Reload from Device" re-synchronization.
+
+### 6. Device Firmware Engine & Cloud OTA
+- **GitHub Release Checker**: Directly queries GitHub API for latest official firmware tags, published date, and full markdown release notes with clock fallback (`/api/ota/check`).
+- **1-Click Cloud OTA**: Triggers over-the-air firmware downloads directly to the ESP32 clock over Wi-Fi (`/api/ota/install?url=...`) with automatic flash write and reboot.
+- **Local .bin Binary Flashing**: Integrated Android storage file picker allowing users to select any pre-compiled `firmware.bin` and flash over HTTP (`/update`) with real-time percentage progress bar streaming via custom `CountingRequestBody`.
+- **TopAppBar Dynamic Badge**: Displays a clickable update badge pill in the top app bar whenever a newer release is detected.
+
+### 7. About & Developer Community Hub
+- **About Dialog**: Full modal with app version (`v1.0.6`), build details, and comprehensive feature summary.
+- **Creator & Support**: Crafted by Radovan Dvorský (`@hackra76`). Includes direct links to GitHub repositories, issue reporting, releases, YouTube channel, and [Buy Me a Coffee](https://buymeacoffee.com/hackra76) support.
+- **Legal & Transparency**: MIT License and hardware trademark disclaimers.
 
 ---
 

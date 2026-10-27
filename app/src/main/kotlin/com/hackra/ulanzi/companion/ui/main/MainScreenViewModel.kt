@@ -56,6 +56,22 @@ data class CanvasState(
     val durationSec: Int = 60
 )
 
+data class FirmwareUpdateState(
+    val isChecking: Boolean = false,
+    val hasUpdate: Boolean = false,
+    val currentVersion: String? = null,
+    val latestVersion: String? = null,
+    val releaseTitle: String? = null,
+    val releaseNotes: String? = null,
+    val downloadUrl: String? = null,
+    val publishedAt: String? = null,
+    val isUpdating: Boolean = false,
+    val progressPercent: Int = 0,
+    val updateStage: String? = null,
+    val isSuccess: Boolean = false,
+    val errorMessage: String? = null
+)
+
 data class MainScreenUiState(
     val connectionState: ConnectionState = ConnectionState.Disconnected,
     val deviceStatus: DeviceStatus? = null,
@@ -78,7 +94,9 @@ data class MainScreenUiState(
     val canvasSelectedColor: String = "#FF0055",
     val canvasTool: CanvasTool = CanvasTool.PEN,
     val isSendingCanvas: Boolean = false,
-    val canvasDisplayDurationSec: Int = 60
+    val canvasDisplayDurationSec: Int = 60,
+    val firmwareUpdateState: FirmwareUpdateState = FirmwareUpdateState(),
+    val showAboutDialog: Boolean = false
 )
 
 class MainScreenViewModel(
@@ -95,6 +113,8 @@ class MainScreenViewModel(
     private val _isRebooting = MutableStateFlow(false)
     private val _actionMessage = MutableStateFlow<String?>(null)
     private val _canvasState = MutableStateFlow(CanvasState())
+    private val _firmwareUpdateState = MutableStateFlow(FirmwareUpdateState())
+    private val _showAboutDialog = MutableStateFlow(false)
 
     private val repositoryFlow = combine(
         repository.connectionState,
@@ -133,9 +153,11 @@ class MainScreenViewModel(
     private val rebootAndCanvasFlow = combine(
         _isRebooting,
         _actionMessage,
-        _canvasState
-    ) { isReboot, msg, canvas ->
-        Tuple3(isReboot, msg, canvas)
+        _canvasState,
+        _firmwareUpdateState,
+        _showAboutDialog
+    ) { isReboot, msg, canvas, fwState, showAbout ->
+        Tuple5(isReboot, msg, canvas, fwState, showAbout)
     }
 
     val uiState: StateFlow<MainScreenUiState> = combine(
@@ -167,7 +189,9 @@ class MainScreenViewModel(
             canvasSelectedColor = rebootCanvas.third.selectedColor,
             canvasTool = rebootCanvas.third.tool,
             isSendingCanvas = rebootCanvas.third.isSending,
-            canvasDisplayDurationSec = rebootCanvas.third.durationSec
+            canvasDisplayDurationSec = rebootCanvas.third.durationSec,
+            firmwareUpdateState = rebootCanvas.fourth,
+            showAboutDialog = rebootCanvas.fifth
         )
     }.stateIn(
         scope = viewModelScope,
@@ -332,6 +356,133 @@ class MainScreenViewModel(
                 _isRebooting.value = false
                 val err = result.exceptionOrNull()?.message ?: "Reboot failed"
                 _actionMessage.value = "Reboot failed: $err"
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Firmware Update (OTA & Local Flash) & About Methods
+    // ---------------------------------------------------------
+    fun setShowAboutDialog(show: Boolean) {
+        _showAboutDialog.value = show
+    }
+
+    fun dismissFirmwareStatus() {
+        _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+            errorMessage = null,
+            isSuccess = false,
+            updateStage = null,
+            isUpdating = false
+        )
+    }
+
+    fun checkForFirmwareUpdate() {
+        viewModelScope.launch {
+            val currentVer = uiState.value.deviceStatus?.firmwareVersion
+            _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                isChecking = true,
+                currentVersion = currentVer,
+                errorMessage = null
+            )
+            repository.checkOtaUpdate(currentVer ?: "")
+                .onSuccess { res ->
+                    _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                        isChecking = false,
+                        hasUpdate = res.hasUpdate,
+                        currentVersion = res.currentVersion ?: currentVer,
+                        latestVersion = res.latestVersion,
+                        releaseTitle = res.title ?: res.latestVersion,
+                        releaseNotes = res.releaseNotes,
+                        downloadUrl = res.downloadUrl,
+                        publishedAt = res.publishedAt,
+                        errorMessage = null
+                    )
+                }
+                .onFailure { err ->
+                    _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                        isChecking = false,
+                        errorMessage = err.message ?: "Failed to check for updates"
+                    )
+                }
+        }
+    }
+
+    fun installCloudOta(downloadUrl: String? = null) {
+        viewModelScope.launch {
+            val targetUrl = downloadUrl ?: _firmwareUpdateState.value.downloadUrl
+            if (targetUrl.isNullOrBlank()) {
+                _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                    errorMessage = "No OTA firmware binary URL specified"
+                )
+                return@launch
+            }
+            _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                isUpdating = true,
+                isSuccess = false,
+                progressPercent = 0,
+                updateStage = "Requesting device to fetch and install update...",
+                errorMessage = null
+            )
+            repository.installCloudOta(targetUrl)
+                .onSuccess {
+                    _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                        isUpdating = false,
+                        isSuccess = true,
+                        progressPercent = 100,
+                        updateStage = "Cloud OTA initiated! The device is downloading and will reboot automatically."
+                    )
+                }
+                .onFailure { err ->
+                    _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                        isUpdating = false,
+                        isSuccess = false,
+                        errorMessage = "Cloud OTA failed: ${err.message}"
+                    )
+                }
+        }
+    }
+
+    fun uploadLocalFirmware(bytes: ByteArray, fileName: String) {
+        viewModelScope.launch {
+            if (bytes.isEmpty()) {
+                _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                    errorMessage = "Selected file is empty."
+                )
+                return@launch
+            }
+            if (bytes.size > 8 * 1024 * 1024) {
+                _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                    errorMessage = "File is too large for ESP32 flash partition (${bytes.size / 1024 / 1024} MB)."
+                )
+                return@launch
+            }
+            _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                isUpdating = true,
+                isSuccess = false,
+                progressPercent = 0,
+                updateStage = "Connecting to device update service...",
+                errorMessage = null
+            )
+            repository.uploadFirmwareBinary(bytes, fileName) { pct ->
+                val totalKb = bytes.size / 1024
+                val sentKb = (bytes.size * pct) / 100 / 1024
+                _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                    progressPercent = pct,
+                    updateStage = "Flashing: $pct% ($sentKb KB / $totalKb KB)"
+                )
+            }.onSuccess {
+                _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                    isUpdating = false,
+                    isSuccess = true,
+                    progressPercent = 100,
+                    updateStage = "Firmware flashed successfully! Device is rebooting..."
+                )
+            }.onFailure { err ->
+                _firmwareUpdateState.value = _firmwareUpdateState.value.copy(
+                    isUpdating = false,
+                    isSuccess = false,
+                    errorMessage = "Firmware flashing failed: ${err.message}"
+                )
             }
         }
     }
