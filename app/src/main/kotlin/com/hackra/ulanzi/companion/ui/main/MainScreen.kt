@@ -135,6 +135,7 @@ import com.hackra.ulanzi.companion.data.notification.NotificationSettings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -330,6 +331,13 @@ fun MainScreen(
                             }
                         }
                     }
+                }
+            }
+
+            LaunchedEffect(uiState.actionMessage) {
+                if (uiState.actionMessage != null) {
+                    delay(3500L)
+                    viewModel.clearActionMessage()
                 }
             }
 
@@ -1478,6 +1486,7 @@ fun ScreensaverDeckCard(
                             onClick = {
                                 selectedStyle = styleId
                                 viewModel.setScreensaverDefaults(styleId, selectedTimeout)
+                                viewModel.saveHardwareSettings(ssStyle = styleId, ssTime = selectedTimeout, successMessage = "Screensaver preset synced to clock ✓")
                             },
                             label = { Text(label, fontSize = 12.sp) }
                         )
@@ -1498,6 +1507,7 @@ fun ScreensaverDeckCard(
                             onClick = {
                                 selectedTimeout = min
                                 viewModel.setScreensaverDefaults(selectedStyle, min)
+                                viewModel.saveHardwareSettings(ssStyle = selectedStyle, ssTime = min, successMessage = "Screensaver timeout synced to clock ✓")
                             },
                             label = { Text("${min}m", fontSize = 12.sp) }
                         )
@@ -2427,6 +2437,79 @@ fun HardwareSetupDeckCard(
         wifiPassInput = ""
     }
 
+    fun autoSave(
+        overrideClkMode: Int? = null,
+        overrideDateFormat: Int? = null,
+        overrideClockIcon: Int? = null,
+        overrideTextAlign: Int? = null,
+        overrideShowSeconds: Boolean? = null,
+        overrideWeekdayBar: Boolean? = null,
+        overrideWeekdayStartMon: Boolean? = null,
+        overrideWeekdayActiveColIdx: Int? = null,
+        overrideWeekdayInactColIdx: Int? = null,
+        overrideWeekdayWeekendColIdx: Int? = null,
+        overrideAutoBri: Boolean? = null,
+        overrideDayBri: Float? = null,
+        overrideNightMode: Boolean? = null,
+        overrideNightBri: Float? = null,
+        overrideNightStart: Int? = null,
+        overrideNightEnd: Int? = null,
+        overrideAutoRotate: Boolean? = null,
+        overrideRotateSec: Float? = null,
+        overrideTransitionFx: Int? = null,
+        overrideActiveApp: Int? = null,
+        overrideCarouselMask: Int? = null,
+        overrideBatMode: Int? = null,
+        overrideSsStyle: Int? = null,
+        overrideSsTime: Int? = null,
+        overrideCity: String? = null,
+        overrideLat: Float? = null,
+        overrideLon: Float? = null,
+        overrideCrypto: String? = null,
+        overrideMqttEn: Boolean? = null,
+        feedbackMessage: String? = "Setting synced to clock ✓"
+    ) {
+        viewModel.saveHardwareSettings(
+            clkMode = overrideClkMode ?: clkMode,
+            dateFormat = overrideDateFormat ?: dateFormat,
+            clockIcon = overrideClockIcon ?: clockIcon,
+            textAlign = overrideTextAlign ?: textAlign,
+            showSeconds = overrideShowSeconds ?: showSeconds,
+            weekdayBar = overrideWeekdayBar ?: weekdayBar,
+            weekdayStartMon = overrideWeekdayStartMon ?: weekdayStartMon,
+            weekdayActiveColIdx = overrideWeekdayActiveColIdx ?: weekdayActiveColIdx,
+            weekdayInactColIdx = overrideWeekdayInactColIdx ?: weekdayInactColIdx,
+            weekdayWeekendColIdx = overrideWeekdayWeekendColIdx ?: weekdayWeekendColIdx,
+            autoBri = overrideAutoBri ?: autoBri,
+            dayBri = (overrideDayBri ?: dayBri).toInt(),
+            nightMode = overrideNightMode ?: nightMode,
+            nightBri = (overrideNightBri ?: nightBri).toInt(),
+            nightStart = overrideNightStart ?: nightStart,
+            nightEnd = overrideNightEnd ?: nightEnd,
+            autoRotate = overrideAutoRotate ?: autoRotate,
+            rotateSec = (overrideRotateSec ?: rotateSec).toInt(),
+            transitionFx = overrideTransitionFx ?: transitionFx,
+            activeApp = overrideActiveApp ?: activeApp,
+            carouselMask = overrideCarouselMask ?: carouselMask,
+            batMode = overrideBatMode ?: batMode,
+            ssStyle = overrideSsStyle ?: ssStyle,
+            ssTime = overrideSsTime ?: ssTime,
+            weatherCity = overrideCity ?: weatherCity,
+            weatherLat = overrideLat ?: weatherLat,
+            weatherLon = overrideLon ?: weatherLon,
+            cryptoSymbol = overrideCrypto ?: cryptoSymbol,
+            ytChannel = ytChannel,
+            ytKey = ytKey.ifBlank { null },
+            mqttEn = overrideMqttEn ?: mqttEn,
+            mqttSrv = mqttSrv,
+            mqttPort = mqttPort,
+            mqttUser = mqttUser,
+            mqttPass = mqttPass.ifBlank { null },
+            mqttPre = mqttPre,
+            successMessage = feedbackMessage
+        )
+    }
+
     val saveAllAction = {
         viewModel.saveHardwareSettings(
             clkMode = clkMode,
@@ -2538,6 +2621,10 @@ fun HardwareSetupDeckCard(
                 ) {
                     Text("💾 Save All Settings to Clock EEPROM & Flash", fontWeight = FontWeight.Bold)
                 }
+                Text(
+                    text = "⚡ Real-time sync: Toggles, sliders & dropdowns transfer to clock immediately.",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
             }
         }
 
@@ -2557,14 +2644,20 @@ fun HardwareSetupDeckCard(
                         label = "CLOCK MODE",
                         items = clockModes,
                         selectedValue = clkMode,
-                        onValueChange = { clkMode = it },
+                        onValueChange = {
+                            clkMode = it
+                            autoSave(overrideClkMode = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     CompactDropdownSelector(
                         label = "DATE NOTATION",
                         items = dateFormats,
                         selectedValue = dateFormat,
-                        onValueChange = { dateFormat = it },
+                        onValueChange = {
+                            dateFormat = it
+                            autoSave(overrideDateFormat = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -2574,14 +2667,20 @@ fun HardwareSetupDeckCard(
                         label = "CLOCK ICON",
                         items = clockIcons,
                         selectedValue = clockIcon,
-                        onValueChange = { clockIcon = it },
+                        onValueChange = {
+                            clockIcon = it
+                            autoSave(overrideClockIcon = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     CompactDropdownSelector(
                         label = "TEXT ALIGNMENT",
                         items = textAlignments,
                         selectedValue = textAlign,
-                        onValueChange = { textAlign = it },
+                        onValueChange = {
+                            textAlign = it
+                            autoSave(overrideTextAlign = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -2598,7 +2697,13 @@ fun HardwareSetupDeckCard(
                         Text("Show Seconds (HH:mm:ss)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                         Text("High-precision 3×5 seconds counter on display", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Switch(checked = showSeconds, onCheckedChange = { showSeconds = it })
+                    Switch(
+                        checked = showSeconds,
+                        onCheckedChange = {
+                            showSeconds = it
+                            autoSave(overrideShowSeconds = it)
+                        }
+                    )
                 }
 
                 // Weekday Bar Toggle
@@ -2611,7 +2716,13 @@ fun HardwareSetupDeckCard(
                         Text("Weekday Indicators (7 Micro-Bars)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                         Text("Row 7 visual status indicators for day of the week", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Switch(checked = weekdayBar, onCheckedChange = { weekdayBar = it })
+                    Switch(
+                        checked = weekdayBar,
+                        onCheckedChange = {
+                            weekdayBar = it
+                            autoSave(overrideWeekdayBar = it)
+                        }
+                    )
                 }
 
                 // Weekday Customization Options (Dropdown Popups)
@@ -2634,12 +2745,18 @@ fun HardwareSetupDeckCard(
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 FilterChip(
                                     selected = weekdayStartMon,
-                                    onClick = { weekdayStartMon = true },
+                                    onClick = {
+                                        weekdayStartMon = true
+                                        autoSave(overrideWeekdayStartMon = true)
+                                    },
                                     label = { Text("Mon (ISO)", fontSize = 11.sp) }
                                 )
                                 FilterChip(
                                     selected = !weekdayStartMon,
-                                    onClick = { weekdayStartMon = false },
+                                    onClick = {
+                                        weekdayStartMon = false
+                                        autoSave(overrideWeekdayStartMon = false)
+                                    },
                                     label = { Text("Sun (US)", fontSize = 11.sp) }
                                 )
                             }
@@ -2688,21 +2805,30 @@ fun HardwareSetupDeckCard(
                             label = "ACTIVE DAY PHOSPHOR COLOR",
                             items = weekdayActiveColors,
                             selectedIdx = weekdayActiveColIdx,
-                            onColorSelected = { weekdayActiveColIdx = it }
+                            onColorSelected = {
+                                weekdayActiveColIdx = it
+                                autoSave(overrideWeekdayActiveColIdx = it)
+                            }
                         )
 
                         ColorDropdownPicker(
                             label = "INACTIVE DAY CONTRAST COLOR",
                             items = weekdayInactiveColors,
                             selectedIdx = weekdayInactColIdx,
-                            onColorSelected = { weekdayInactColIdx = it }
+                            onColorSelected = {
+                                weekdayInactColIdx = it
+                                autoSave(overrideWeekdayInactColIdx = it)
+                            }
                         )
 
                         ColorDropdownPicker(
                             label = "WEEKEND PHOSPHOR COLOR",
                             items = weekendColors,
                             selectedIdx = weekdayWeekendColIdx,
-                            onColorSelected = { weekdayWeekendColIdx = it }
+                            onColorSelected = {
+                                weekdayWeekendColIdx = it
+                                autoSave(overrideWeekdayWeekendColIdx = it)
+                            }
                         )
                     }
                 }
@@ -2726,7 +2852,13 @@ fun HardwareSetupDeckCard(
                         Text("Auto-Rotate Carousel", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                         Text("Cycles enabled screens sequentially", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Switch(checked = autoRotate, onCheckedChange = { autoRotate = it })
+                    Switch(
+                        checked = autoRotate,
+                        onCheckedChange = {
+                            autoRotate = it
+                            autoSave(overrideAutoRotate = it)
+                        }
+                    )
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -2734,7 +2866,13 @@ fun HardwareSetupDeckCard(
                         Text("Screen Dwell Interval", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
                         Text("${rotateSec.toInt()}s", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
                     }
-                    Slider(value = rotateSec, onValueChange = { rotateSec = it }, valueRange = 3f..120f, steps = 117)
+                    Slider(
+                        value = rotateSec,
+                        onValueChange = { rotateSec = it },
+                        onValueChangeFinished = { autoSave(overrideRotateSec = rotateSec) },
+                        valueRange = 3f..120f,
+                        steps = 117
+                    )
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2742,14 +2880,20 @@ fun HardwareSetupDeckCard(
                         label = "TRANSITION FX",
                         items = transitionFxList,
                         selectedValue = transitionFx,
-                        onValueChange = { transitionFx = it },
+                        onValueChange = {
+                            transitionFx = it
+                            autoSave(overrideTransitionFx = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     CompactDropdownSelector(
                         label = "DEFAULT SCREEN",
                         items = screenNames,
                         selectedValue = activeApp,
-                        onValueChange = { activeApp = it },
+                        onValueChange = {
+                            activeApp = it
+                            autoSave(overrideActiveApp = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -2764,7 +2908,9 @@ fun HardwareSetupDeckCard(
                                 selected = isEnabled,
                                 onClick = {
                                     val newMask = carouselMask xor (1 shl appId)
-                                    carouselMask = if (newMask == 0) 0x01 else newMask
+                                    val updated = if (newMask == 0) 0x01 else newMask
+                                    carouselMask = updated
+                                    autoSave(overrideCarouselMask = updated)
                                 },
                                 leadingIcon = if (isEnabled) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) } } else null,
                                 label = { Text(name, fontSize = 11.sp) }
@@ -2792,7 +2938,13 @@ fun HardwareSetupDeckCard(
                         Text("Auto-Brightness via LDR Sensor", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                         Text("Dynamically adapts matrix gamma via onboard light sensor", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Switch(checked = autoBri, onCheckedChange = { autoBri = it })
+                    Switch(
+                        checked = autoBri,
+                        onCheckedChange = {
+                            autoBri = it
+                            autoSave(overrideAutoBri = it)
+                        }
+                    )
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -2800,7 +2952,13 @@ fun HardwareSetupDeckCard(
                         Text("Day Brightness Ceiling", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
                         Text("${dayBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
                     }
-                    Slider(value = dayBri, onValueChange = { dayBri = it }, valueRange = 5f..100f, steps = 19)
+                    Slider(
+                        value = dayBri,
+                        onValueChange = { dayBri = it },
+                        onValueChangeFinished = { autoSave(overrideDayBri = dayBri) },
+                        valueRange = 5f..100f,
+                        steps = 19
+                    )
                 }
 
                 Row(
@@ -2812,7 +2970,13 @@ fun HardwareSetupDeckCard(
                         Text("Night Mode (Quiet Dim Red Clock)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                         Text("Ultra-dim red display during quiet hours to avoid sleep disturbance", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
-                    Switch(checked = nightMode, onCheckedChange = { nightMode = it })
+                    Switch(
+                        checked = nightMode,
+                        onCheckedChange = {
+                            nightMode = it
+                            autoSave(overrideNightMode = it)
+                        }
+                    )
                 }
 
                 AnimatedVisibility(visible = nightMode) {
@@ -2822,7 +2986,13 @@ fun HardwareSetupDeckCard(
                                 Text("Night Brightness Floor", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
                                 Text("${nightBri.toInt()}%", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
                             }
-                            Slider(value = nightBri, onValueChange = { nightBri = it }, valueRange = 1f..25f, steps = 24)
+                            Slider(
+                                value = nightBri,
+                                onValueChange = { nightBri = it },
+                                onValueChangeFinished = { autoSave(overrideNightBri = nightBri) },
+                                valueRange = 1f..25f,
+                                steps = 24
+                            )
                         }
 
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2834,7 +3004,13 @@ fun HardwareSetupDeckCard(
                             ) {
                                 OutlinedTextField(
                                     value = nightStart.toString(),
-                                    onValueChange = { v -> v.toIntOrNull()?.let { nightStart = it.coerceIn(0, 23) } },
+                                    onValueChange = { v ->
+                                        v.toIntOrNull()?.let {
+                                            val clamped = it.coerceIn(0, 23)
+                                            nightStart = clamped
+                                            autoSave(overrideNightStart = clamped)
+                                        }
+                                    },
                                     label = { Text("Start (0-23h)") },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
@@ -2842,7 +3018,13 @@ fun HardwareSetupDeckCard(
                                 Text("→", fontWeight = FontWeight.Bold)
                                 OutlinedTextField(
                                     value = nightEnd.toString(),
-                                    onValueChange = { v -> v.toIntOrNull()?.let { nightEnd = it.coerceIn(0, 23) } },
+                                    onValueChange = { v ->
+                                        v.toIntOrNull()?.let {
+                                            val clamped = it.coerceIn(0, 23)
+                                            nightEnd = clamped
+                                            autoSave(overrideNightEnd = clamped)
+                                        }
+                                    },
                                     label = { Text("End (0-23h)") },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
@@ -2860,14 +3042,20 @@ fun HardwareSetupDeckCard(
                         label = "BATTERY TELEMETRY",
                         items = batteryModes,
                         selectedValue = batMode,
-                        onValueChange = { batMode = it },
+                        onValueChange = {
+                            batMode = it
+                            autoSave(overrideBatMode = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     CompactDropdownSelector(
                         label = "SCREENSAVER STYLE",
                         items = screensaverStyles,
                         selectedValue = ssStyle,
-                        onValueChange = { ssStyle = it },
+                        onValueChange = {
+                            ssStyle = it
+                            autoSave(overrideSsStyle = it)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -2876,7 +3064,10 @@ fun HardwareSetupDeckCard(
                     label = "SCREENSAVER INACTIVITY TIMEOUT",
                     items = screensaverTimeouts,
                     selectedValue = ssTime,
-                    onValueChange = { ssTime = it }
+                    onValueChange = {
+                        ssTime = it
+                        autoSave(overrideSsTime = it)
+                    }
                 )
             }
         }
@@ -2905,6 +3096,7 @@ fun HardwareSetupDeckCard(
                             cityPresets.find { it.first == selectedCity }?.let { (_, coords) ->
                                 weatherLat = coords.first
                                 weatherLon = coords.second
+                                autoSave(overrideCity = selectedCity, overrideLat = coords.first, overrideLon = coords.second, feedbackMessage = "Weather location set to $selectedCity ✓")
                             }
                         }
                     )
@@ -2933,6 +3125,14 @@ fun HardwareSetupDeckCard(
                             singleLine = true
                         )
                     }
+
+                    Button(
+                        onClick = { autoSave(overrideCity = weatherCity, overrideLat = weatherLat, overrideLon = weatherLon, feedbackMessage = "Weather coordinates applied ✓") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("📍 Apply Weather Coordinates")
+                    }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -2948,7 +3148,10 @@ fun HardwareSetupDeckCard(
                         label = "ASSET PRESET",
                         items = assetDropdownItems,
                         selectedValue = cryptoSymbol,
-                        onValueChange = { cryptoSymbol = it }
+                        onValueChange = {
+                            cryptoSymbol = it
+                            autoSave(overrideCrypto = it, feedbackMessage = "Crypto ticker set to $it ✓")
+                        }
                     )
 
                     OutlinedTextField(
@@ -2958,6 +3161,14 @@ fun HardwareSetupDeckCard(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+
+                    Button(
+                        onClick = { autoSave(overrideCrypto = cryptoSymbol, feedbackMessage = "Crypto symbol applied ✓") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("📊 Apply Crypto Symbol")
+                    }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -2985,6 +3196,20 @@ fun HardwareSetupDeckCard(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+
+                    Button(
+                        onClick = {
+                            viewModel.saveHardwareSettings(
+                                ytChannel = ytChannel,
+                                ytKey = ytKey.ifBlank { null },
+                                successMessage = "YouTube settings applied ✓"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("▶ Apply YouTube Settings")
+                    }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -3009,7 +3234,13 @@ fun HardwareSetupDeckCard(
                             )
                         )
                     }
-                    Switch(checked = mqttEn, onCheckedChange = { mqttEn = it })
+                    Switch(
+                        checked = mqttEn,
+                        onCheckedChange = {
+                            mqttEn = it
+                            autoSave(overrideMqttEn = it, feedbackMessage = if (it) "MQTT enabled ✓" else "MQTT disabled ✓")
+                        }
+                    )
                 }
 
                 AnimatedVisibility(visible = mqttEn) {
@@ -3056,6 +3287,24 @@ fun HardwareSetupDeckCard(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
+
+                        Button(
+                            onClick = {
+                                viewModel.saveHardwareSettings(
+                                    mqttEn = mqttEn,
+                                    mqttSrv = mqttSrv,
+                                    mqttPort = mqttPort,
+                                    mqttUser = mqttUser,
+                                    mqttPass = mqttPass.ifBlank { null },
+                                    mqttPre = mqttPre,
+                                    successMessage = "MQTT configuration applied ✓"
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("📡 Apply MQTT Configuration")
+                        }
                     }
                 }
             }
@@ -3162,6 +3411,22 @@ fun HardwareSetupDeckCard(
                                 Text("Clear Slot", color = MaterialTheme.colorScheme.error)
                             }
                         }
+
+                        Button(
+                            onClick = {
+                                viewModel.saveHardwareSettings(
+                                    wifiSlot = selectedWifiSlot,
+                                    wifiSsid = wifiSsidInput.ifBlank { null },
+                                    wifiPass = wifiPassInput.ifBlank { null },
+                                    successMessage = "Wi-Fi Profile #$selectedWifiSlot saved to clock!"
+                                )
+                            },
+                            enabled = wifiSsidInput.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("💾 Save Profile #$selectedWifiSlot to Memory")
+                        }
                     }
                 }
 
@@ -3208,6 +3473,10 @@ fun HardwareSetupDeckCard(
                 Text(
                     text = "COMMIT TO HARDWARE STORAGE",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                )
+                Text(
+                    text = "Instant settings sync immediately upon change. Tap below to execute a complete full-state EEPROM/Flash write cycle.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
 
                 Button(
@@ -4006,7 +4275,7 @@ fun AboutContactDeckCard(
             }
 
             Text(
-                text = "Ulanzi TC001 Companion v1.0.6 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
+                text = "Ulanzi TC001 Companion v1.0.7 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
             )
 
@@ -4053,9 +4322,9 @@ fun AboutDialog(
     val appVersion = remember {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.6"
+            pInfo.versionName ?: "1.0.7"
         } catch (_: Exception) {
-            "1.0.6"
+            "1.0.7"
         }
     }
 

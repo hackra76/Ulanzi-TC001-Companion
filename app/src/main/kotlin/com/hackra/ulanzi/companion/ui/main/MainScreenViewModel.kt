@@ -20,6 +20,7 @@ import com.hackra.ulanzi.companion.data.model.WifiResponse
 import com.hackra.ulanzi.companion.data.notification.ForwardedNotificationLog
 import com.hackra.ulanzi.companion.data.notification.NotificationSettings
 import com.hackra.ulanzi.companion.data.notification.NotificationSettingsManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -214,7 +215,23 @@ class MainScreenViewModel(
         _selectedTab.value = tab
     }
 
+    private var actionMessageJob: Job? = null
+
+    fun setActionMessage(message: String?, autoDismissDelayMs: Long = 3500L) {
+        actionMessageJob?.cancel()
+        _actionMessage.value = message
+        if (message != null && autoDismissDelayMs > 0) {
+            actionMessageJob = viewModelScope.launch {
+                delay(autoDismissDelayMs)
+                if (_actionMessage.value == message) {
+                    _actionMessage.value = null
+                }
+            }
+        }
+    }
+
     fun clearActionMessage() {
+        actionMessageJob?.cancel()
         _actionMessage.value = null
     }
 
@@ -266,7 +283,7 @@ class MainScreenViewModel(
     fun sendNotification(text: String, icon: String = "bell", sound: Int = 1, duration: Int = 5) {
         viewModelScope.launch {
             repository.sendNotification(NotifyPayload(text = text, icon = icon, sound = sound, duration = duration))
-            _actionMessage.value = "Notification sent to clock display!"
+            setActionMessage("Notification sent to clock display!")
         }
     }
 
@@ -305,12 +322,12 @@ class MainScreenViewModel(
 
     fun connectWifiSlot(slot: Int) {
         viewModelScope.launch {
-            _actionMessage.value = "Connecting clock to Wi-Fi slot $slot..."
+            setActionMessage("Connecting clock to Wi-Fi slot $slot...")
             repository.connectWifiSlot(slot).onSuccess {
-                _actionMessage.value = "Connected to Wi-Fi slot $slot!"
+                setActionMessage("Connected to Wi-Fi slot $slot!")
                 refreshWifi()
             }.onFailure {
-                _actionMessage.value = "Failed to connect to Wi-Fi slot $slot: ${it.message}"
+                setActionMessage("Failed to connect to Wi-Fi slot $slot: ${it.message}")
             }
         }
     }
@@ -318,26 +335,26 @@ class MainScreenViewModel(
     fun scanWifiNetworks() {
         viewModelScope.launch {
             _isScanningWifi.value = true
-            _actionMessage.value = "Scanning nearby Wi-Fi networks from clock RF antenna..."
+            setActionMessage("Scanning nearby Wi-Fi networks from clock RF antenna...")
             repository.scanWifi().onSuccess { results ->
                 _scannedWifiList.value = results
                 _isScanningWifi.value = false
-                _actionMessage.value = "Discovered ${results.size} nearby Wi-Fi networks!"
+                setActionMessage("Discovered ${results.size} nearby Wi-Fi networks!")
             }.onFailure { err ->
                 _isScanningWifi.value = false
-                _actionMessage.value = "Wi-Fi scan failed: ${err.message}"
+                setActionMessage("Wi-Fi scan failed: ${err.message}")
             }
         }
     }
 
     fun deleteWifiSlot(slot: Int) {
         viewModelScope.launch {
-            _actionMessage.value = "Clearing Wi-Fi Profile #$slot from clock..."
+            setActionMessage("Clearing Wi-Fi Profile #$slot from clock...")
             repository.deleteWifiSlot(slot).onSuccess {
-                _actionMessage.value = "Wi-Fi Profile #$slot cleared!"
+                setActionMessage("Wi-Fi Profile #$slot cleared!")
                 refreshWifi()
             }.onFailure { err ->
-                _actionMessage.value = "Failed to clear profile #$slot: ${err.message}"
+                setActionMessage("Failed to clear profile #$slot: ${err.message}")
             }
         }
     }
@@ -345,17 +362,17 @@ class MainScreenViewModel(
     fun rebootClock() {
         viewModelScope.launch {
             _isRebooting.value = true
-            _actionMessage.value = "Sending reboot command to clock..."
+            setActionMessage("Sending reboot command to clock...")
             val result = repository.rebootDevice()
             if (result.isSuccess) {
-                _actionMessage.value = "Clock reboot initiated. Re-probing connection..."
+                setActionMessage("Clock reboot initiated. Re-probing connection...")
                 delay(3000)
                 _isRebooting.value = false
                 repository.refreshStatus()
             } else {
                 _isRebooting.value = false
                 val err = result.exceptionOrNull()?.message ?: "Reboot failed"
-                _actionMessage.value = "Reboot failed: $err"
+                setActionMessage("Reboot failed: $err")
             }
         }
     }
@@ -547,16 +564,16 @@ class MainScreenViewModel(
         val matrix = uiState.value.displayMatrix?.pixels
         if (matrix != null && matrix.size == 8 && matrix.all { it.size == 32 }) {
             _canvasState.value = _canvasState.value.copy(pixels = matrix)
-            _actionMessage.value = "📥 Display cloned into Canvas Studio!"
+            setActionMessage("📥 Display cloned into Canvas Studio!")
         } else {
-            _actionMessage.value = "No active display matrix stream to clone."
+            setActionMessage("No active display matrix stream to clone.")
         }
     }
 
     fun loadCanvasPreset(presetName: String) {
         val preset = CanvasPresets.getPreset(presetName)
         _canvasState.value = _canvasState.value.copy(pixels = preset)
-        _actionMessage.value = "Loaded preset: ${presetName.uppercase()}"
+        setActionMessage("Loaded preset: ${presetName.uppercase()}")
     }
 
     fun sendCanvasToClock() {
@@ -566,11 +583,11 @@ class MainScreenViewModel(
             val res = repository.sendCanvasPixels(state.pixels, state.durationSec)
             _canvasState.value = _canvasState.value.copy(isSending = false)
             if (res.isSuccess) {
-                _actionMessage.value = "🎨 Drawing sent to Ulanzi TC001 matrix (${state.durationSec}s)!"
+                setActionMessage("🎨 Drawing sent to Ulanzi TC001 matrix (${state.durationSec}s)!")
                 delay(300)
                 repository.refreshDisplayMatrix()
             } else {
-                _actionMessage.value = "Failed to send canvas: ${res.exceptionOrNull()?.message}"
+                setActionMessage("Failed to send canvas: ${res.exceptionOrNull()?.message}")
             }
         }
     }
@@ -758,7 +775,10 @@ class MainScreenViewModel(
         wifiSlot: Int? = null,
         wifiSsid: String? = null,
         wifiPass: String? = null,
-        deleteWifiSlot: Int? = null
+        deleteWifiSlot: Int? = null,
+
+        // Optional custom feedback message
+        successMessage: String? = "Hardware EEPROM settings saved to clock!"
     ) {
         viewModelScope.launch {
             val current = uiState.value.deviceStatus
@@ -882,7 +902,9 @@ class MainScreenViewModel(
 
             val res = repository.saveSettings(params)
             if (res.isSuccess) {
-                _actionMessage.value = "Hardware EEPROM settings saved to clock!"
+                if (successMessage != null) {
+                    setActionMessage(successMessage)
+                }
                 devicePreferencesManager.setHardwareBrightnessDefaults(
                     dayBri = effectiveDayBri,
                     nightBri = effectiveNightBri,
@@ -893,7 +915,7 @@ class MainScreenViewModel(
                 repository.refreshStatus()
                 refreshWifi()
             } else {
-                _actionMessage.value = "Failed to save settings: ${res.exceptionOrNull()?.message}"
+                setActionMessage("Failed to save settings: ${res.exceptionOrNull()?.message}")
             }
         }
     }

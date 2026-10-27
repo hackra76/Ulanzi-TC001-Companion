@@ -4,7 +4,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.4.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.6-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.7-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
@@ -17,6 +17,8 @@ Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry
 
 | Feature | ESP32 Web Portal | Android Companion App | Notes |
 | :--- | :---: | :---: | :--- |
+| **Real-Time Instant Hardware Sync** | ❌ (Manual Save) | ✅ **Exclusive** | Auto-saves toggles, dropdowns, and debounced sliders directly to ESP32 NVS without manual saving |
+| **Auto-Dismiss Notification Engine** | ❌ | ✅ **Exclusive** | In-app feedback banners auto-dismiss after 3.5s with coroutine lifecycle cancellation |
 | **Live Device State Loading** | ✅ | ✅ | Automatically reads active configuration from `/status` and `/api/wifi` |
 | **Live 32×8 Matrix Mirror** | ✅ | ✅ | Real-time NeoPixel stream with high-contrast LED rendering |
 | **Real-time Telemetry Deck** | ✅ | ✅ | SHT30 Temp & Humidity, Battery Gauge %, Volts, RSSI dBm, LDR |
@@ -117,7 +119,9 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
 - Manual alert tester to compose and push custom notifications with icon and sound.
 
 ### 5. Hardware EEPROM Configuration Deck (100% Web Portal Replacement)
-- Permanent clock configuration updates committed directly to ESP32 EEPROM/NVS flash via `/save`, with automatic initial state synchronization from `/status`.
+- **Real-Time Instant Hardware Sync**: Clock configuration changes are automatically dispatched and committed directly to ESP32 EEPROM/NVS flash via `/save` upon toggle switch, dropdown selection, or debounced slider release (`onValueChangeFinished`), completely eliminating the need for manual "Save All" actions.
+- **Auto-Dismissing Feedback Engine**: All success and status notification banners feature an automatic 3.5-second dismissal timer backed by coroutine lifecycle cancellation.
+- **Discrete Apply Actions**: Dedicated inline Apply/Save buttons for discrete configurations (Wi-Fi slot profiles, MQTT credentials, Weather coordinates, Crypto tickers, YouTube API key).
 - **Clock & Date Architecture**:
   - Clock Display Mode (Time Only, Combined Alternating, Date Only).
   - Date Notation Formats (DD.MM., DD MMM, MM/DD, DAY DD).
@@ -164,7 +168,7 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
 - **TopAppBar Dynamic Badge**: Displays a clickable update badge pill in the top app bar whenever a newer release is detected.
 
 ### 7. About & Developer Community Hub
-- **About Dialog**: Full modal with app version (`v1.0.6`), build details, and comprehensive feature summary.
+- **About Dialog**: Full modal with app version (`v1.0.7`), build details, and comprehensive feature summary.
 - **Creator & Support**: Crafted by Radovan Dvorský (`@hackra76`). Includes direct links to GitHub repositories, issue reporting, releases, YouTube channel, and [Buy Me a Coffee](https://buymeacoffee.com/hackra76) support.
 - **Legal & Transparency**: MIT License and hardware trademark disclaimers.
 

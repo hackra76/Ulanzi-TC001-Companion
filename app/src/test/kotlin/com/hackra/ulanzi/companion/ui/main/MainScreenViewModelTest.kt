@@ -338,6 +338,57 @@ class MainScreenViewModelTest {
         assertEquals(8, repo.lastSentPixels?.size)
         assertEquals(32, repo.lastSentPixels?.get(0)?.size)
     }
+
+    @Test
+    fun actionMessage_autoDismissesAfterDelay() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        viewModel.setActionMessage("Test Notification", autoDismissDelayMs = 2000L)
+        assertEquals("Test Notification", viewModel.uiState.value.actionMessage)
+
+        testScheduler.advanceTimeBy(1000L)
+        assertEquals("Test Notification", viewModel.uiState.value.actionMessage)
+
+        testScheduler.advanceTimeBy(1500L)
+        assertEquals(null, viewModel.uiState.value.actionMessage)
+    }
+
+    @Test
+    fun saveHardwareSettings_autoSyncsAndEmitsFeedback() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        viewModel.saveHardwareSettings(
+            clkMode = 1,
+            showSeconds = true,
+            autoBri = false,
+            dayBri = 80,
+            successMessage = "Setting synced to clock ✓"
+        )
+
+        assertEquals("1", repo.lastSavedSettings?.get("clk_mode"))
+        assertEquals("1", repo.lastSavedSettings?.get("show_sec"))
+        assertEquals("80", repo.lastSavedSettings?.get("day_bri"))
+        assertEquals("Setting synced to clock ✓", viewModel.uiState.value.actionMessage)
+
+        testScheduler.advanceTimeBy(3600L)
+        assertEquals(null, viewModel.uiState.value.actionMessage)
+    }
 }
 
 private class FakeUlanziRepository : UlanziRepository {
