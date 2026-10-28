@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Ulanzi TC001 Companion</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --border: #334155;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f8fafc;
+        --card-bg: #ffffff;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --primary: #0284c7;
+        --border: #e2e8f0;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 2.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+      color: var(--primary);
+    }
+    h2 {
+      font-size: 1.25rem;
+      margin-top: 1.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    p, li {
+      color: var(--text);
+    }
+    .meta {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    ul {
+      padding-left: 1.5rem;
+    }
+    li {
+      margin-bottom: 0.5rem;
+    }
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    code {
+      background: rgba(148, 163, 184, 0.15);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <div class="meta">
+      <strong>Application:</strong> Ulanzi TC001 Companion (<code>com.ulanzi.companion</code>)<br>
+      <strong>Last Updated:</strong> October 28, 2026
+    </div>
+
+    <p>
+      <strong>Ulanzi TC001 Companion</strong> is an open-source Android application developed by <strong>hackra76</strong> designed to configure, control, and stream telemetry to your local Ulanzi TC001 Smart Pixel Clock.
+    </p>
+
+    <h2>1. Zero Personal Data Collection</h2>
+    <p>
+      The application does not collect, track, record, transmit, or monetize any personal information, location data, usage analytics, advertising IDs, or unique device identifiers.
+    </p>
+
+    <h2>2. Local Network Communication</h2>
+    <p>
+      All communication occurs strictly over your local Wi-Fi network (LAN) directly between your Android device and the ESP32 microcontroller inside your Ulanzi TC001 clock via local HTTP REST endpoints (e.g., <code>http://&lt;local-clock-ip&gt;/api/...</code>). No data is ever transmitted to external cloud servers, analytics providers, or remote third-party systems.
+    </p>
+
+    <h2>3. Android Permissions Usage</h2>
+    <ul>
+      <li>
+        <strong><code>INTERNET</code>, <code>ACCESS_NETWORK_STATE</code>, <code>ACCESS_WIFI_STATE</code>:</strong> 
+        Required exclusively to communicate with your clock on your local Wi-Fi subnet and detect Wi-Fi connection states.
+      </li>
+      <li>
+        <strong><code>CHANGE_WIFI_MULTICAST_STATE</code>:</strong> 
+        Used solely for local device discovery (mDNS / SSDP) across your home network.
+      </li>
+      <li>
+        <strong>Notification Access (<code>BIND_NOTIFICATION_LISTENER_SERVICE</code>):</strong> 
+        An optional feature used exclusively to format and display incoming app notification previews (title, text, app icon) on the physical LED matrix display of your clock. Notification data is processed ephemerally in real-time in device RAM; it is never saved to storage, logged, or uploaded to any remote server.
+      </li>
+    </ul>
+
+    <h2>4. Third-Party Services & Ads</h2>
+    <p>
+      The app contains no advertisements, no tracking SDKs, no analytics tools (such as Google Analytics or Firebase), and no third-party data-sharing integrations.
+    </p>
+
+    <h2>5. Data Storage & Security</h2>
+    <p>
+      User preferences (such as your clock's local IP address and UI options) are stored locally on your device using Android Jetpack DataStore and are completely deleted when you uninstall the application.
+    </p>
+
+    <h2>6. Open Source Transparency</h2>
+    <p>
+      The complete source code is publicly accessible for review and verification at: <br>
+      <a href="https://github.com/hackra76/Ulanzi-TC001-Companion" target="_blank" rel="noopener noreferrer">https://github.com/hackra76/Ulanzi-TC001-Companion</a>
+    </p>
+
+    <h2>7. Contact</h2>
+    <p>
+      If you have questions or concerns regarding this Privacy Policy, please contact the developer via the official repository: <br>
+      <a href="https://github.com/hackra76/Ulanzi-TC001-Companion/issues" target="_blank" rel="noopener noreferrer">https://github.com/hackra76/Ulanzi-TC001-Companion/issues</a>
+    </p>
+  </div>
+</body>
+</html>
