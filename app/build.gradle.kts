@@ -8,7 +8,7 @@ android {
   namespace = "com.hackra.ulanzi.companion"
   compileSdk = 36
   defaultConfig {
-    applicationId = "com.hackra.ulanzi.companion"
+    applicationId = "com.ulanzi.companion"
     minSdk = 26
     targetSdk = 36
     versionCode = 8

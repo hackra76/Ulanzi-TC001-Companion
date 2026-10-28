@@ -197,7 +197,8 @@ Download the official signed release APK from **[GitHub Releases](https://github
 - **DPI & Multi-Ratio Scaling**: Hardware-accelerated Compose `Canvas` for 32×8 matrix rendering, flexible `FlowRow` chips, and auto-wrapping responsive layouts supporting ultra-high DPI flagships (S26 Ultra), standard phones, and foldables.
 - **Requirements**:
   - Minimum SDK: Android 8.0 (API 26)
-  - Target SDK: Android 15 (API 35)
+  - Target SDK: Android 16 (API 36)
+  - Package ID: `com.ulanzi.companion`
   - Build Toolchain: Gradle 9.1 + OpenJDK 17 LTS
 
 ---
@@ -214,10 +215,20 @@ cd Ulanzi-TC001-Companion
 
 # Build production signed release APK
 .\gradlew.bat assembleRelease
+
+# Build production signed Android App Bundle (AAB for Google Play)
+.\gradlew.bat bundleRelease
 ```
 
-The compiled release APK will be generated at:
-`app/build/outputs/apk/release/app-release.apk`
+The compiled release artifacts will be generated at:
+- APK: `app/build/outputs/apk/release/app-release.apk`
+- AAB: `app/build/outputs/bundle/release/app-release.aab`
+
+---
+
+## 🔒 Privacy Policy
+
+Ulanzi TC001 Companion respects user privacy with zero data tracking, zero ads, and strictly local LAN communication. See the [Privacy Policy](PRIVACY_POLICY.md) for full details.
 
 ---
 
