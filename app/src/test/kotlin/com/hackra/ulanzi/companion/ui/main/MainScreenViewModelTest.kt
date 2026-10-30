@@ -389,7 +389,46 @@ class MainScreenViewModelTest {
         testScheduler.advanceTimeBy(3600L)
         assertEquals(null, viewModel.uiState.value.actionMessage)
     }
+
+    @Test
+    fun triggerBuzzerPreset_dispatchesPresetAndEmitsFeedback() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        viewModel.triggerBuzzerPreset("alert")
+        assertEquals("alert", repo.lastBuzzerCall?.sound)
+        assertEquals(false, repo.lastBuzzerCall?.stop)
+        assertEquals("Buzzer: ALERT triggered", viewModel.uiState.value.actionMessage)
+
+        viewModel.stopBuzzer()
+        assertEquals(true, repo.lastBuzzerCall?.stop)
+        assertEquals("Buzzer playback stopped", viewModel.uiState.value.actionMessage)
+
+        viewModel.playCustomRtttl("mario:d=4,o=5,b=100:16e6,16e6")
+        assertEquals("mario:d=4,o=5,b=100:16e6,16e6", repo.lastBuzzerCall?.rtttl)
+        assertEquals("Playing RTTTL melody...", viewModel.uiState.value.actionMessage)
+
+        viewModel.playCustomTone(2400, 150)
+        assertEquals(2400, repo.lastBuzzerCall?.freq)
+        assertEquals(150, repo.lastBuzzerCall?.durationMs)
+        assertEquals("Emitted 2400Hz tone (150ms)", viewModel.uiState.value.actionMessage)
+    }
 }
+
+private data class BuzzerCallRecord(
+    val sound: String?,
+    val rtttl: String?,
+    val freq: Int?,
+    val durationMs: Int?,
+    val stop: Boolean
+)
 
 private class FakeUlanziRepository : UlanziRepository {
     override val connectionState: StateFlow<ConnectionState> = MutableStateFlow(ConnectionState.Disconnected)
@@ -402,6 +441,7 @@ private class FakeUlanziRepository : UlanziRepository {
     var lastSavedSettings: Map<String, String>? = null
     var lastSentPixels: List<List<String>>? = null
     var lastSentDuration: Int? = null
+    var lastBuzzerCall: BuzzerCallRecord? = null
 
     override fun startDiscovery(scope: CoroutineScope) {}
     override fun stopDiscovery() {}
@@ -430,6 +470,16 @@ private class FakeUlanziRepository : UlanziRepository {
     override suspend fun controlScreensaver(style: Int?, timeout: Int?, action: String?): Result<ScreensaverResponse> {
         lastScreensaverCall = Triple(style, timeout, action)
         return Result.success(ScreensaverResponse())
+    }
+    override suspend fun controlBuzzer(
+        sound: String?,
+        rtttl: String?,
+        freq: Int?,
+        durationMs: Int?,
+        stop: Boolean
+    ): Result<com.hackra.ulanzi.companion.data.model.BuzzerResponse> {
+        lastBuzzerCall = BuzzerCallRecord(sound, rtttl, freq, durationMs, stop)
+        return Result.success(com.hackra.ulanzi.companion.data.model.BuzzerResponse(status = "ok", sound = sound))
     }
     override suspend fun getWifiStatus(): Result<WifiResponse> = Result.success(WifiResponse())
     override suspend fun scanWifi(): Result<List<com.hackra.ulanzi.companion.data.model.WifiScanResult>> = Result.success(emptyList())

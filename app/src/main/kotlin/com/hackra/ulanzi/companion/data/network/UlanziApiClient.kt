@@ -1,5 +1,6 @@
 package com.hackra.ulanzi.companion.data.network
 
+import com.hackra.ulanzi.companion.data.model.BuzzerResponse
 import com.hackra.ulanzi.companion.data.model.CanvasPayload
 import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
@@ -243,6 +244,47 @@ class UlanziApiClient(
                 if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
                 val body = response.body?.string().orEmpty()
                 json.decodeFromString<ScreensaverResponse>(body)
+            }
+        }
+    }
+
+    suspend fun controlBuzzer(
+        sound: String? = null,
+        rtttl: String? = null,
+        freq: Int? = null,
+        durationMs: Int? = null,
+        stop: Boolean = false
+    ): Result<BuzzerResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            val builder = "$baseUrl/api/buzzer".toHttpUrlOrNull()?.newBuilder()
+                ?: throw IllegalArgumentException("Invalid URL: $baseUrl/api/buzzer")
+            if (stop) {
+                builder.addQueryParameter("stop", "1")
+            } else if (!rtttl.isNullOrBlank()) {
+                builder.addQueryParameter("rtttl", rtttl)
+            } else if (freq != null && freq > 0) {
+                builder.addQueryParameter("freq", freq.toString())
+                if (durationMs != null && durationMs > 0) {
+                    builder.addQueryParameter("duration", durationMs.toString())
+                }
+            } else if (!sound.isNullOrBlank()) {
+                builder.addQueryParameter("sound", sound)
+            }
+
+            val request = Request.Builder()
+                .url(builder.build())
+                .header("Accept", "application/json")
+                .post("{}".toRequestBody(jsonMediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                val body = response.body?.string().orEmpty()
+                if (body.isBlank() || body.trim() == "ok") {
+                    BuzzerResponse(status = "ok")
+                } else {
+                    json.decodeFromString<BuzzerResponse>(body)
+                }
             }
         }
     }

@@ -5,6 +5,7 @@ import com.hackra.ulanzi.companion.data.datastore.DevicePreferencesManager
 import com.hackra.ulanzi.companion.data.discovery.DeviceDiscoveryManager
 import com.hackra.ulanzi.companion.data.discovery.DiscoveredDevice
 import com.hackra.ulanzi.companion.data.discovery.DiscoveryState
+import com.hackra.ulanzi.companion.data.model.BuzzerResponse
 import com.hackra.ulanzi.companion.data.model.CustomAppPayload
 import com.hackra.ulanzi.companion.data.model.DeviceStatus
 import com.hackra.ulanzi.companion.data.model.DisplayMatrixResponse
@@ -54,6 +55,13 @@ interface UlanziRepository {
     suspend fun deleteCustomApp(name: String): Result<GenericStatusResponse>
     suspend fun controlTimer(action: String, mode: String? = null, duration: Int? = null): Result<TimerResponse>
     suspend fun controlScreensaver(style: Int? = null, timeout: Int? = null, action: String? = null): Result<ScreensaverResponse>
+    suspend fun controlBuzzer(
+        sound: String? = null,
+        rtttl: String? = null,
+        freq: Int? = null,
+        durationMs: Int? = null,
+        stop: Boolean = false
+    ): Result<BuzzerResponse>
     suspend fun getWifiStatus(): Result<WifiResponse>
     suspend fun scanWifi(): Result<List<WifiScanResult>>
     suspend fun connectWifiSlot(slot: Int): Result<Unit>
@@ -182,6 +190,18 @@ class DefaultUlanziRepository(
 
     override suspend fun controlScreensaver(style: Int?, timeout: Int?, action: String?): Result<ScreensaverResponse> {
         val res = apiClient.controlScreensaver(style, timeout, action)
+        res.onSuccess { refreshStatus() }
+        return res
+    }
+
+    override suspend fun controlBuzzer(
+        sound: String?,
+        rtttl: String?,
+        freq: Int?,
+        durationMs: Int?,
+        stop: Boolean
+    ): Result<BuzzerResponse> {
+        val res = apiClient.controlBuzzer(sound, rtttl, freq, durationMs, stop)
         res.onSuccess { refreshStatus() }
         return res
     }

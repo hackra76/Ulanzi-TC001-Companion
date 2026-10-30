@@ -65,6 +65,9 @@ data class DeviceStatus(
     @SerialName("mqtt_pre") val mqttPre: String = "ulanzi-tc001",
     @SerialName("ui_lang") val uiLang: String? = null,
     @SerialName("mqtt_connected") val mqttConnected: Boolean = false,
+    @SerialName("buzzer_playing") val buzzerPlaying: Boolean = false,
+    @SerialName("free_heap") val freeHeap: Long? = null,
+    @SerialName("uptime_sec") val uptimeSec: Long? = null,
     @SerialName("wifi_profiles") val wifiProfiles: List<WifiProfile> = emptyList()
 )
 
@@ -184,4 +187,13 @@ data class GitHubRelease(
     @SerialName("html_url") val htmlUrl: String = "",
     @SerialName("assets") val assets: List<GitHubReleaseAsset> = emptyList()
 )
+
+@Serializable
+data class BuzzerResponse(
+    @SerialName("status") val status: String = "ok",
+    @SerialName("sound") val sound: String? = null,
+    @SerialName("action") val action: String? = null,
+    @SerialName("playing") val playing: Boolean = false
+)
+
 

@@ -305,6 +305,48 @@ class MainScreenViewModel(
         }
     }
 
+    fun triggerBuzzerPreset(preset: String) {
+        viewModelScope.launch {
+            repository.controlBuzzer(sound = preset).onSuccess {
+                setActionMessage("Buzzer: ${preset.uppercase()} triggered")
+            }.onFailure {
+                setActionMessage("Buzzer request failed: ${it.localizedMessage}")
+            }
+        }
+    }
+
+    fun stopBuzzer() {
+        viewModelScope.launch {
+            repository.controlBuzzer(stop = true).onSuccess {
+                setActionMessage("Buzzer playback stopped")
+            }.onFailure {
+                setActionMessage("Stop failed: ${it.localizedMessage}")
+            }
+        }
+    }
+
+    fun playCustomRtttl(rtttl: String) {
+        val clean = rtttl.trim()
+        if (clean.isBlank()) return
+        viewModelScope.launch {
+            repository.controlBuzzer(rtttl = clean).onSuccess {
+                setActionMessage("Playing RTTTL melody...")
+            }.onFailure {
+                setActionMessage("RTTTL playback failed: ${it.localizedMessage}")
+            }
+        }
+    }
+
+    fun playCustomTone(freq: Int, durationMs: Int) {
+        viewModelScope.launch {
+            repository.controlBuzzer(freq = freq, durationMs = durationMs).onSuccess {
+                setActionMessage("Emitted ${freq}Hz tone (${durationMs}ms)")
+            }.onFailure {
+                setActionMessage("Tone emit failed: ${it.localizedMessage}")
+            }
+        }
+    }
+
     fun refreshStatus() {
         viewModelScope.launch {
             repository.refreshStatus()

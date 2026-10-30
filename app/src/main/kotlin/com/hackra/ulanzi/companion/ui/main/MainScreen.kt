@@ -15,6 +15,11 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -532,7 +537,10 @@ fun ControlsTabContent(
     // 1. Hardware Timer & Stopwatch Deck
     TimerDeckCard(uiState = uiState, viewModel = viewModel)
 
-    // 2. Ambient Screensaver Deck
+    // 2. Acoustic Signal & Buzzer Testbench Deck
+    AcousticBuzzerDeckCard(uiState = uiState, viewModel = viewModel)
+
+    // 3. Ambient Screensaver Deck
     ScreensaverDeckCard(uiState = uiState, viewModel = viewModel)
 }
 
@@ -1046,6 +1054,46 @@ fun InteractivePixelCanvasCard(
 }
 
 @Composable
+fun StatusDiodePill(
+    name: String,
+    active: Boolean,
+    activeColor: Color
+) {
+    Surface(
+        color = if (active) activeColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(
+            1.dp,
+            if (active) activeColor.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(
+                        if (active) activeColor else Color.Gray.copy(alpha = 0.4f),
+                        CircleShape
+                    )
+            )
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            )
+        }
+    }
+}
+
+@Composable
 fun TelemetryDeckCard(status: DeviceStatus) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -1063,6 +1111,32 @@ fun TelemetryDeckCard(status: DeviceStatus) {
                     color = MaterialTheme.colorScheme.primary
                 )
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StatusDiodePill(name = "MATRIX", active = true, activeColor = Color(0xFF00E676))
+                StatusDiodePill(
+                    name = "AUDIO",
+                    active = status.buzzerPlaying,
+                    activeColor = Color(0xFFFF9800)
+                )
+                StatusDiodePill(name = "WIFI", active = status.state == "connected", activeColor = Color(0xFF00E676))
+                StatusDiodePill(name = "MQTT", active = status.mqttConnected, activeColor = Color(0xFF00E676))
+                if (status.freeHeap != null && status.freeHeap > 0) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "Heap: ${status.freeHeap / 1024}K",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1434,6 +1508,238 @@ fun TimerDeckCard(
     }
 }
 
+// -------------------------------------------------------------
+// ACOUSTIC SIGNAL & BUZZER TESTBENCH DECK
+// -------------------------------------------------------------
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AcousticBuzzerDeckCard(
+    uiState: MainScreenUiState,
+    viewModel: MainScreenViewModel
+) {
+    val status = uiState.deviceStatus
+    val isPlaying = status?.buzzerPlaying ?: false
+
+    var rtttlInput by remember { mutableStateOf("") }
+    var selectedToneFreq by remember { mutableIntStateOf(2400) }
+    var selectedToneDuration by remember { mutableIntStateOf(100) }
+
+    val presets = listOf(
+        "click" to "🔉 Click",
+        "alert" to "⚠️ Alert",
+        "success" to "✔️ Success",
+        "notification" to "🔔 Notification",
+        "alarm" to "🚨 Alarm"
+    )
+
+    val melodyPresets = listOf(
+        "Mario" to "mario:d=4,o=5,b=100:16e6,16e6,32p,8e6,16c6,8e6,8g6,8p,8g",
+        "Pac-Man" to "pacman:d=4,o=5,b=120:32b,32p,32b6,32p,32f#6,32p,32d#6,32p,32b6,32f#6,16d#6,32p,32c6,32p,32c7,32p,32g6,32p,32e6,32p,32c7,32g6,16e6",
+        "Nokia" to "nokia:d=4,o=5,b=160:e6,d6,f#,g#,c#6,b,d,e,b,a,c#,e,a",
+        "Star Wars" to "starwars:d=4,o=5,b=45:32f,32f,32f,8a#.,8f.6,32d#6,32d6,32c6,8a#.6,8f.6,32d#6,32d6,32c6,8a#.6,4f.6"
+    )
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "ACOUSTIC SIGNAL & BUZZER TESTBENCH",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "Hardware Piezoelectric Melody & Tone Sequencer",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+
+                if (isPlaying) {
+                    Surface(
+                        color = Color(0xFFFF9800).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, Color(0xFFFF9800)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(Color(0xFFFF9800), CircleShape)
+                            )
+                            Text(
+                                text = "PLAYING",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFFF9800)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Section 1: Melodic Presets
+            Text(
+                text = "MELODIC SOUND PRESETS:",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                presets.forEach { (presetKey, label) ->
+                    FilledTonalButton(
+                        onClick = { viewModel.triggerBuzzerPreset(presetKey) },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(label, fontSize = 12.sp)
+                    }
+                }
+
+                Button(
+                    onClick = { viewModel.stopBuzzer() },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text("⏹ Stop Audio", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Section 2: RTTTL Ringtone Melody Player
+            Text(
+                text = "RTTTL MELODY SEQUENCER:",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+            )
+
+            Text(
+                text = "Quick Presets:",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                melodyPresets.forEach { (name, rtttl) ->
+                    SuggestionChip(
+                        onClick = {
+                            rtttlInput = rtttl
+                            viewModel.playCustomRtttl(rtttl)
+                        },
+                        label = { Text("🎶 $name", fontSize = 11.sp) }
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = rtttlInput,
+                onValueChange = { rtttlInput = it },
+                label = { Text("RTTTL String") },
+                placeholder = { Text("Pacman:d=4,o=5,b=120:...") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+            )
+
+            Button(
+                onClick = { viewModel.playCustomRtttl(rtttlInput) },
+                enabled = rtttlInput.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("▶ Play Custom RTTTL Melody")
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Section 3: Precision Frequency Tone Generator
+            Text(
+                text = "PRECISION TONE GENERATOR (BEEP):",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val freqs = listOf(800, 1500, 2400, 3200, 4000)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Frequency: ${selectedToneFreq} Hz",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        freqs.forEach { f ->
+                            FilterChip(
+                                selected = selectedToneFreq == f,
+                                onClick = { selectedToneFreq = f },
+                                label = { Text("${f}Hz", fontSize = 10.sp) }
+                            )
+                        }
+                    }
+                }
+
+                val durations = listOf(50, 100, 200, 500)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Duration: ${selectedToneDuration} ms",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        durations.forEach { d ->
+                            FilterChip(
+                                selected = selectedToneDuration == d,
+                                onClick = { selectedToneDuration = d },
+                                label = { Text("${d}ms", fontSize = 10.sp) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = { viewModel.playCustomTone(selectedToneFreq, selectedToneDuration) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("🔊 Emit Tone (${selectedToneFreq}Hz / ${selectedToneDuration}ms)")
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ScreensaverDeckCard(
@@ -1652,7 +1958,14 @@ fun NotificationForwardingDeckCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("BUZZER CHIME:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    val sounds = listOf(0 to "Silent", 1 to "Beep", 2 to "Chime", 3 to "Alarm")
+                    val sounds = listOf(
+                        0 to "🔇 Silent",
+                        1 to "🔉 Click",
+                        2 to "⚠️ Alert",
+                        3 to "✔️ Success",
+                        4 to "🔔 Chime",
+                        5 to "🚨 Alarm"
+                    )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         sounds.forEach { (snd, label) ->
                             FilterChip(
@@ -1791,6 +2104,37 @@ fun NotificationPushCard(
                         selected = selectedIcon == icon,
                         onClick = { onIconChange(icon) },
                         label = { Text(icon, fontSize = 11.sp) }
+                    )
+                }
+            }
+
+            Text("ACOUSTIC SOUND PRESET:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+            val sounds = listOf(
+                0 to "🔇 Silent",
+                1 to "🔉 Click",
+                2 to "⚠️ Alert",
+                3 to "✔️ Success",
+                4 to "🔔 Chime",
+                5 to "🚨 Alarm"
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                sounds.forEach { (sndIdx, sndLabel) ->
+                    FilterChip(
+                        selected = sound == sndIdx,
+                        onClick = { onSoundChange(sndIdx) },
+                        label = { Text(sndLabel, fontSize = 11.sp) }
+                    )
+                }
+            }
+
+            Text("DISPLAY DURATION: ${duration}s", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+            val durations = listOf(3, 5, 8, 10, 15)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                durations.forEach { durSec ->
+                    FilterChip(
+                        selected = duration == durSec,
+                        onClick = { onDurationChange(durSec) },
+                        label = { Text("${durSec}s", fontSize = 11.sp) }
                     )
                 }
             }
@@ -4275,7 +4619,7 @@ fun AboutContactDeckCard(
             }
 
             Text(
-                text = "Ulanzi TC001 Companion v1.0.7 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
+                text = "Ulanzi TC001 Companion v1.0.8 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
             )
 
@@ -4322,9 +4666,9 @@ fun AboutDialog(
     val appVersion = remember {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.7"
+            pInfo.versionName ?: "1.0.8"
         } catch (_: Exception) {
-            "1.0.7"
+            "1.0.8"
         }
     }
 

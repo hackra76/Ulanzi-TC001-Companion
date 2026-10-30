@@ -3,8 +3,8 @@
 [![Android](https://img.shields.io/badge/Platform-Android_8.0+_(API_26+)-brightgreen?logo=android)](https://www.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
-[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.4.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.7-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.5.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
+[![Release](https://img.shields.io/badge/Release-v1.0.8-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
@@ -30,6 +30,8 @@ Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry
 | **Ambient & Night Cycle** | ✅ | ✅ | LDR Auto-brightness, day ceiling (5–100%), quiet red night mode & hours schedule |
 | **Battery Telemetry Format** | ✅ | ✅ | Alternating (% & V every 3s), Percentage Only, Voltage Only |
 | **Hardware Timer / Stopwatch** | ✅ | ✅ | Mode selector, digital simulation readout, 1m/3m/5m/10m/15m/25m Pomodoro |
+| **Acoustic Signal & Buzzer Testbench** | ✅ | ✅ | Melodic presets (Click, Alert, Success, Chime, Alarm, Stop), RTTTL melody sequencer (Mario, Pac-Man, Nokia, Star Wars), and precision tone generator |
+| **Hardware Status Diodes & Diagnostics** | ✅ | ✅ | Live MATRIX, AUDIO (tone active), WIFI, and MQTT status diodes plus free heap memory telemetry |
 | **Ambient Screensavers** | ✅ | ✅ | 5 styles (Matrix Rain, Fire, Pac-Man, Game of Life, Dynamic Shuffle) + timeout |
 | **Multi-Profile Wi-Fi (4 Slots)** | ✅ | ✅ | 4 profile slots, slot roaming, credential editor, 1-tap connect, 1-tap clear |
 | **Wi-Fi RF Scanner** | ✅ | ✅ | Scan nearby APs via clock antenna and assign to any slot |
@@ -168,7 +170,7 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
 - **TopAppBar Dynamic Badge**: Displays a clickable update badge pill in the top app bar whenever a newer release is detected.
 
 ### 7. About & Developer Community Hub
-- **About Dialog**: Full modal with app version (`v1.0.7`), build details, and comprehensive feature summary.
+- **About Dialog**: Full modal with app version (`v1.0.8`), build details, and comprehensive feature summary.
 - **Creator & Support**: Crafted by Radovan Dvorský (`@hackra76`). Includes direct links to GitHub repositories, issue reporting, releases, YouTube channel, and [Buy Me a Coffee](https://buymeacoffee.com/hackra76) support.
 - **Legal & Transparency**: MIT License and hardware trademark disclaimers.
 
