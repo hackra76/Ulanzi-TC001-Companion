@@ -420,6 +420,20 @@ class MainScreenViewModelTest {
         assertEquals(150, repo.lastBuzzerCall?.durationMs)
         assertEquals("Emitted 2400Hz tone (150ms)", viewModel.uiState.value.actionMessage)
     }
+
+    @Test
+    fun clearBackupStatus_resetsState() = runTest {
+        val repo = FakeUlanziRepository()
+        val notifManager = NotificationSettingsManager()
+        val mediaManager = MediaSyncManager(repo)
+        val prefsManager = DevicePreferencesManager()
+        val viewModel = MainScreenViewModel(repo, notifManager, mediaManager, prefsManager)
+
+        viewModel.clearBackupStatus()
+        assertEquals(false, viewModel.backupRestoreState.value.isExporting)
+        assertEquals(false, viewModel.backupRestoreState.value.isRestoring)
+        assertEquals(null, viewModel.backupRestoreState.value.statusMessage)
+    }
 }
 
 private data class BuzzerCallRecord(
@@ -500,4 +514,13 @@ private class FakeUlanziRepository : UlanziRepository {
         onProgress: (Int) -> Unit
     ): Result<GenericStatusResponse> =
         Result.success(GenericStatusResponse())
+
+    var backupSettingsResult: Result<String> = Result.success("{\"app\":\"Ulanzi-TC001-Evolved\"}")
+    var lastRestoredJson: String? = null
+
+    override suspend fun getBackupSettings(): Result<String> = backupSettingsResult
+    override suspend fun restoreBackupSettings(jsonString: String): Result<GenericStatusResponse> {
+        lastRestoredJson = jsonString
+        return Result.success(GenericStatusResponse(status = "ok"))
+    }
 }

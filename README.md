@@ -3,8 +3,8 @@
 [![Android](https://img.shields.io/badge/Platform-Android_8.0+_(API_26+)-brightgreen?logo=android)](https://www.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
-[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.5.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.8-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.7.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
+[![Release](https://img.shields.io/badge/Release-v1.0.9-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
@@ -40,6 +40,7 @@ Engineered with modern **Material 3 Design**, tactile retro-futuristic telemetry
 | **YouTube Channel Telemetry** | ✅ | ✅ | Channel @handle / ID & Google Cloud API key |
 | **Home Assistant & MQTT** | ✅ | ✅ | Auto-discovery switch, broker IP/port, auth, topic prefix, live status |
 | **Remote Hardware Reboot** | ✅ | ✅ | Instant `/reboot` trigger with automated reconnect handshake |
+| **Configuration Backup & Restore** | ✅ | ✅ | Export full device settings snapshot to JSON and restore from file with immediate NVS commit |
 | **Firmware Update & OTA Engine** | ✅ | ✅ | GitHub release checker, 1-click cloud OTA (`/api/ota/install`), and local `.bin` flash (`/update`) with live percentage progress |
 | **About & Developer Hub** | ❌ | ✅ **Exclusive** | App version info, release notes viewer, Buy Me a Coffee support, GitHub repos, and issue tracker |
 | **Interactive Pixel Canvas Studio** | ❌ | ✅ **Exclusive** | 32×8 touch/drag drawing engine, 13-color neon palette, pen/eraser/bucket, 7 retro presets, clock cloner & hardware push |
@@ -170,7 +171,7 @@ The app is built around a modern Material 3 `NavigationBar` with 5 dedicated fun
 - **TopAppBar Dynamic Badge**: Displays a clickable update badge pill in the top app bar whenever a newer release is detected.
 
 ### 7. About & Developer Community Hub
-- **About Dialog**: Full modal with app version (`v1.0.8`), build details, and comprehensive feature summary.
+- **About Dialog**: Full modal with app version (`v1.0.9`), build details, and comprehensive feature summary.
 - **Creator & Support**: Crafted by Radovan Dvorský (`@hackra76`). Includes direct links to GitHub repositories, issue reporting, releases, YouTube channel, and [Buy Me a Coffee](https://buymeacoffee.com/hackra76) support.
 - **Legal & Transparency**: MIT License and hardware trademark disclaimers.
 

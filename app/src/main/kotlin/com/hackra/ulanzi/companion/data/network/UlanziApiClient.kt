@@ -548,6 +548,36 @@ class UlanziApiClient(
         }
     }
 
+    suspend fun getBackupJson(): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("$baseUrl/api/backup")
+                .header("Accept", "application/json")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                response.body?.string().orEmpty()
+            }
+        }
+    }
+
+    suspend fun restoreBackupJson(jsonString: String): Result<GenericStatusResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("$baseUrl/api/restore")
+                .post(jsonString.toRequestBody(jsonMediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                val body = response.body?.string().orEmpty()
+                if (body.isBlank()) GenericStatusResponse(status = "ok", app = "Restored") else json.decodeFromString<GenericStatusResponse>(body)
+            }
+        }
+    }
+
     private fun isVersionNewer(latest: String, current: String): Boolean {
         try {
             val latestParts = latest.split('.').map { it.toIntOrNull() ?: 0 }

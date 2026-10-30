@@ -1,6 +1,8 @@
 package com.hackra.ulanzi.companion.ui.main
 
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hackra.ulanzi.companion.data.ConnectionState
@@ -25,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -71,6 +74,13 @@ data class FirmwareUpdateState(
     val updateStage: String? = null,
     val isSuccess: Boolean = false,
     val errorMessage: String? = null
+)
+
+data class BackupRestoreState(
+    val isExporting: Boolean = false,
+    val isRestoring: Boolean = false,
+    val statusMessage: String? = null,
+    val isError: Boolean = false
 )
 
 data class MainScreenUiState(
@@ -544,6 +554,85 @@ class MainScreenViewModel(
                 )
             }
         }
+    }
+
+    // ---------------------------------------------------------
+    // Configuration Backup & Restore Methods
+    // ---------------------------------------------------------
+    private val _backupRestoreState = MutableStateFlow(BackupRestoreState())
+    val backupRestoreState: StateFlow<BackupRestoreState> = _backupRestoreState.asStateFlow()
+
+    fun exportBackup(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _backupRestoreState.value = BackupRestoreState(isExporting = true)
+            repository.getBackupSettings().onSuccess { jsonStr ->
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(jsonStr.toByteArray(Charsets.UTF_8))
+                        os.flush()
+                    }
+                    _backupRestoreState.value = BackupRestoreState(
+                        isExporting = false,
+                        statusMessage = "Configuration backup successfully exported to file!",
+                        isError = false
+                    )
+                } catch (e: Exception) {
+                    _backupRestoreState.value = BackupRestoreState(
+                        isExporting = false,
+                        statusMessage = "Failed writing backup file: ${e.message}",
+                        isError = true
+                    )
+                }
+            }.onFailure { err ->
+                _backupRestoreState.value = BackupRestoreState(
+                    isExporting = false,
+                    statusMessage = "Failed to export backup: ${err.message}",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun restoreBackup(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _backupRestoreState.value = BackupRestoreState(isRestoring = true)
+            try {
+                val jsonStr = context.contentResolver.openInputStream(uri)?.use { `is` ->
+                    `is`.bufferedReader(Charsets.UTF_8).readText()
+                }.orEmpty()
+                if (jsonStr.isBlank()) {
+                    _backupRestoreState.value = BackupRestoreState(
+                        isRestoring = false,
+                        statusMessage = "Selected backup file is empty",
+                        isError = true
+                    )
+                    return@launch
+                }
+                repository.restoreBackupSettings(jsonStr).onSuccess {
+                    _backupRestoreState.value = BackupRestoreState(
+                        isRestoring = false,
+                        statusMessage = "Settings restored successfully to hardware EEPROM!",
+                        isError = false
+                    )
+                }.onFailure { err ->
+                    _backupRestoreState.value = BackupRestoreState(
+                        isRestoring = false,
+                        statusMessage = "Failed to restore backup: ${err.message}",
+                        isError = true
+                    )
+                }
+            } catch (e: Exception) {
+                _backupRestoreState.value = BackupRestoreState(
+                    isRestoring = false,
+                    statusMessage = "Failed reading backup file: ${e.message}",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun clearBackupStatus() {
+        _backupRestoreState.value = BackupRestoreState()
     }
 
     // ---------------------------------------------------------

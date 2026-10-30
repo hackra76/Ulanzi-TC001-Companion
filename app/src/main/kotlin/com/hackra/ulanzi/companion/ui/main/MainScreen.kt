@@ -598,6 +598,7 @@ fun SettingsTabContent(
 ) {
     FirmwareUpdateDeckCard(uiState = uiState, viewModel = viewModel)
     HardwareSetupDeckCard(uiState = uiState, viewModel = viewModel)
+    BackupRestoreDeckCard(viewModel = viewModel)
     AboutContactDeckCard(onOpenAboutDialog = { viewModel.setShowAboutDialog(true) })
 }
 
@@ -4569,6 +4570,208 @@ fun FirmwareUpdateDeckCard(
 }
 
 @Composable
+fun BackupRestoreDeckCard(
+    viewModel: MainScreenViewModel
+) {
+    val context = LocalContext.current
+    val backupState by viewModel.backupRestoreState.collectAsStateWithLifecycle()
+    var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.exportBackup(context, uri)
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            pendingRestoreUri = uri
+            showRestoreConfirmDialog = true
+        }
+    }
+
+    if (showRestoreConfirmDialog && pendingRestoreUri != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showRestoreConfirmDialog = false
+                pendingRestoreUri = null
+            },
+            title = { Text("Confirm Configuration Restore") },
+            text = {
+                Text("Are you sure you want to restore settings from this backup file? All active device parameters, Wi-Fi profiles, and screen preferences will be committed directly to clock EEPROM.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val uri = pendingRestoreUri
+                        showRestoreConfirmDialog = false
+                        pendingRestoreUri = null
+                        if (uri != null) {
+                            viewModel.restoreBackup(context, uri)
+                        }
+                    }
+                ) {
+                    Text("Restore Now")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showRestoreConfirmDialog = false
+                        pendingRestoreUri = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.RestartAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "CONFIGURATION BACKUP & RESTORE",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "Export settings to JSON file or restore previous configuration",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+            }
+
+            // Status Banner if present
+            if (backupState.statusMessage != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (backupState.isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = if (backupState.isError) Icons.Filled.Warning else Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = if (backupState.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = backupState.statusMessage ?: "",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = if (backupState.isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.clearBackupStatus() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Dismiss",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = {
+                        exportLauncher.launch("ulanzi_tc001_backup.json")
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !backupState.isExporting && !backupState.isRestoring
+                ) {
+                    if (backupState.isExporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    } else {
+                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(if (backupState.isExporting) "Exporting..." else "Export Backup")
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !backupState.isExporting && !backupState.isRestoring
+                ) {
+                    if (backupState.isRestoring) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    } else {
+                        Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(if (backupState.isRestoring) "Restoring..." else "Restore Backup")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AboutContactDeckCard(
     onOpenAboutDialog: () -> Unit
 ) {
@@ -4619,7 +4822,7 @@ fun AboutContactDeckCard(
             }
 
             Text(
-                text = "Ulanzi TC001 Companion v1.0.8 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
+                text = "Ulanzi TC001 Companion v1.0.9 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
             )
 
@@ -4666,9 +4869,9 @@ fun AboutDialog(
     val appVersion = remember {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.8"
+            pInfo.versionName ?: "1.0.9"
         } catch (_: Exception) {
-            "1.0.8"
+            "1.0.9"
         }
     }
 

@@ -71,6 +71,8 @@ interface UlanziRepository {
     suspend fun checkOtaUpdate(currentVersion: String = ""): Result<OtaCheckResponse>
     suspend fun installCloudOta(downloadUrl: String): Result<GenericStatusResponse>
     suspend fun uploadFirmwareBinary(bytes: ByteArray, fileName: String, onProgress: (Int) -> Unit): Result<GenericStatusResponse>
+    suspend fun getBackupSettings(): Result<String>
+    suspend fun restoreBackupSettings(jsonString: String): Result<GenericStatusResponse>
 }
 
 class DefaultUlanziRepository(
@@ -248,4 +250,13 @@ class DefaultUlanziRepository(
         onProgress: (Int) -> Unit
     ): Result<GenericStatusResponse> =
         apiClient.uploadFirmwareBinary(bytes, fileName, onProgress)
+
+    override suspend fun getBackupSettings(): Result<String> =
+        apiClient.getBackupJson()
+
+    override suspend fun restoreBackupSettings(jsonString: String): Result<GenericStatusResponse> {
+        val res = apiClient.restoreBackupJson(jsonString)
+        res.onSuccess { refreshStatus() }
+        return res
+    }
 }
