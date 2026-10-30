@@ -312,6 +312,12 @@ class MainScreenViewModel(
     fun controlScreensaver(style: Int? = null, timeout: Int? = null, action: String? = null) {
         viewModelScope.launch {
             repository.controlScreensaver(style, timeout, action)
+            if (action == "stop" || action == "deactivate" || action == "wake") {
+                val current = uiState.value.deviceStatus
+                if (current?.activeApp == 8) {
+                    repository.switchScreen(appIndex = 0)
+                }
+            }
         }
     }
 
@@ -848,6 +854,10 @@ class MainScreenViewModel(
     fun stopScreensaver() {
         viewModelScope.launch {
             repository.controlScreensaver(action = "stop")
+            val current = uiState.value.deviceStatus
+            if (current?.activeApp == 8) {
+                repository.switchScreen(appIndex = 0)
+            }
         }
     }
 

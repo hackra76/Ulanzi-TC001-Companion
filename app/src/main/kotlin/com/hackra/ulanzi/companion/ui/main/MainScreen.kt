@@ -4822,7 +4822,7 @@ fun AboutContactDeckCard(
             }
 
             Text(
-                text = "Ulanzi TC001 Companion v1.0.9 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
+                text = "Ulanzi TC001 Companion v1.0.10 is an open-source hardware companion app engineered by Radovan Dvorský (@hackra76) for the Ulanzi TC-001 Smart Pixel Clock running custom firmware (Evolved).",
                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
             )
 
@@ -4869,9 +4869,9 @@ fun AboutDialog(
     val appVersion = remember {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.9"
+            pInfo.versionName ?: "1.0.10"
         } catch (_: Exception) {
-            "1.0.9"
+            "1.0.10"
         }
     }
 

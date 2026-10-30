@@ -3,8 +3,8 @@
 [![Android](https://img.shields.io/badge/Platform-Android_8.0+_(API_26+)-brightgreen?logo=android)](https://www.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
-[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.7.0+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
-[![Release](https://img.shields.io/badge/Release-v1.0.9-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
+[![Firmware](https://img.shields.io/badge/Ulanzi_TC001_Evolved-v2.7.1+-orange)](https://github.com/hackra76/Ulanzi-TC001-Evolved)
+[![Release](https://img.shields.io/badge/Release-v1.0.10-success?logo=github)](https://github.com/hackra76/Ulanzi-TC001-Companion/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Official Android Companion App for the **[Ulanzi TC001 Smart Pixel Desktop Clock](https://github.com/hackra76/Ulanzi-TC001-Evolved)** running **Ulanzi TC001 Evolved** firmware.
